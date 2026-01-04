@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Apolon.Core", "Apolon.Core\Apolon.Core.csproj", "{9AA999C6-C000-4DC4-9A2B-6571708AE6FE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Apolon.Models", "Apolon.Models\Apolon.Models.csproj", "{8619C6E3-65A7-4A58-B8EB-2BEC5E8739C2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebApp", "WebApp\WebApp.csproj", "{0B4A2BCF-2332-49AC-AB2B-D69BF596A17A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9AA999C6-C000-4DC4-9A2B-6571708AE6FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9AA999C6-C000-4DC4-9A2B-6571708AE6FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9AA999C6-C000-4DC4-9A2B-6571708AE6FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9AA999C6-C000-4DC4-9A2B-6571708AE6FE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8619C6E3-65A7-4A58-B8EB-2BEC5E8739C2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8619C6E3-65A7-4A58-B8EB-2BEC5E8739C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8619C6E3-65A7-4A58-B8EB-2BEC5E8739C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8619C6E3-65A7-4A58-B8EB-2BEC5E8739C2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0B4A2BCF-2332-49AC-AB2B-D69BF596A17A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0B4A2BCF-2332-49AC-AB2B-D69BF596A17A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0B4A2BCF-2332-49AC-AB2B-D69BF596A17A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0B4A2BCF-2332-49AC-AB2B-D69BF596A17A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
