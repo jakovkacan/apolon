@@ -6,4 +6,8 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\Apolon.Core\Apolon.Core.csproj" />
+    </ItemGroup>
+
 </Project>

@@ -4,7 +4,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Apolon.Core", "Apolon.Core\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Apolon.Models", "Apolon.Models\Apolon.Models.csproj", "{8619C6E3-65A7-4A58-B8EB-2BEC5E8739C2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebApp", "WebApp\WebApp.csproj", "{0B4A2BCF-2332-49AC-AB2B-D69BF596A17A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Apolon.WebApp", "Apolon.WebApp\Apolon.WebApp.csproj", "{0B4A2BCF-2332-49AC-AB2B-D69BF596A17A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
