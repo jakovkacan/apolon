@@ -17,7 +17,7 @@ public class EntityMapper
             return cached;
 
         var tableAttr = entityType.GetCustomAttribute<TableAttribute>()
-            ?? throw new MappingException($"Type {entityType.Name} must be decorated with [Table]");
+                        ?? throw new MappingException($"Type {entityType.Name} must be decorated with [Table]");
 
         var metadata = new EntityMetadata
         {
@@ -41,7 +41,7 @@ public class EntityMapper
         foreach (var prop in entityType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             // Skip navigation properties (ICollection, non-primitive types)
-            if (prop.PropertyType.IsGenericType && 
+            if (prop.PropertyType.IsGenericType &&
                 prop.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>))
                 continue;
 
@@ -49,7 +49,7 @@ public class EntityMapper
                 continue;
 
             var columnAttr = prop.GetCustomAttribute<ColumnAttribute>();
-            var columnName = columnAttr?.Name ?? prop.Name;
+            var columnName = columnAttr?.Name ?? ConvertPascalToSnakeCase(prop.Name);
             var dbType = columnAttr?.DbType ?? TypeMapper.GetPostgresType(prop.PropertyType);
             var isNullable = columnAttr?.IsNullable ?? true;
             var defaultValue = columnAttr?.DefaultValue;
@@ -72,7 +72,7 @@ public class EntityMapper
 
     private static PrimaryKeyMetadata ExtractPrimaryKey(Type entityType)
     {
-        var prop = entityType.GetProperties().FirstOrDefault(p => 
+        var prop = entityType.GetProperties().FirstOrDefault(p =>
             p.GetCustomAttribute<PrimaryKeyAttribute>() != null);
 
         if (prop == null)
@@ -119,7 +119,7 @@ public class EntityMapper
         foreach (var prop in entityType.GetProperties())
         {
             // 1-to-Many: ICollection<T>
-            if (prop.PropertyType.IsGenericType && 
+            if (prop.PropertyType.IsGenericType &&
                 prop.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>))
             {
                 var relatedType = prop.PropertyType.GetGenericArguments()[0];
@@ -155,13 +155,37 @@ public class EntityMapper
 
     private static bool IsPrimitiveOrSimpleType(Type type)
     {
-        return type.IsPrimitive || type == typeof(string) || type == typeof(DateTime) || 
-               type == typeof(decimal) || type == typeof(Guid) || 
+        return type.IsPrimitive || type == typeof(string) || type == typeof(DateTime) ||
+               type == typeof(decimal) || type == typeof(Guid) ||
                (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>));
     }
 
     private static bool IsPersistentType(Type type)
     {
         return type.GetCustomAttribute<TableAttribute>() != null;
+    }
+
+    private static string ConvertPascalToSnakeCase(string pascalCase)
+    {
+        if (string.IsNullOrEmpty(pascalCase))
+            return pascalCase;
+
+        var result = new System.Text.StringBuilder();
+        result.Append(char.ToLower(pascalCase[0]));
+
+        for (var i = 1; i < pascalCase.Length; i++)
+        {
+            if (char.IsUpper(pascalCase[i]))
+            {
+                result.Append('_');
+                result.Append(char.ToLower(pascalCase[i]));
+            }
+            else
+            {
+                result.Append(pascalCase[i]);
+            }
+        }
+
+        return result.ToString();
     }
 }

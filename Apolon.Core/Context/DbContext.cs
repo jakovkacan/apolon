@@ -5,7 +5,7 @@ namespace Apolon.Core.Context;
 
 public abstract class DbContext : IDisposable
 {
-    protected readonly DbConnection _connection;
+    private readonly DbConnection _connection;
     private readonly Dictionary<Type, object> _dbSets = new();
 
     protected DbContext(string connectionString)
@@ -18,11 +18,11 @@ public abstract class DbContext : IDisposable
     public DbSet<T> Set<T>() where T : class
     {
         var type = typeof(T);
-        if (!_dbSets.ContainsKey(type))
-        {
-            _dbSets[type] = new DbSet<T>(_connection);
-        }
-        return (DbSet<T>)_dbSets[type];
+        if (_dbSets.TryGetValue(type, out var value)) return (DbSet<T>)value;
+        
+        value = new DbSet<T>(_connection);
+        _dbSets[type] = value;
+        return (DbSet<T>)value;
     }
 
     public virtual int SaveChanges()
@@ -32,7 +32,15 @@ public abstract class DbContext : IDisposable
         {
             // Reflection to call SaveChanges on each DbSet
             var saveMethod = dbSet.GetType().GetMethod("SaveChanges");
-            total += (int)saveMethod.Invoke(dbSet, null);
+            try
+            {
+                total += (int)saveMethod.Invoke(dbSet, null);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
         }
         return total;
     }

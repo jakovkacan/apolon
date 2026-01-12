@@ -9,16 +9,11 @@ namespace Apolon.Core.Query;
 
 public class QueryBuilder<T> where T : class
 {
-    private readonly EntityMetadata _metadata;
-    private readonly List<string> _whereClauses = new();
-    private readonly List<ParameterMapping> _parameters = new();
+    private readonly EntityMetadata _metadata = EntityMapper.GetMetadata(typeof(T));
+    private readonly List<string> _whereClauses = [];
+    private readonly List<ParameterMapping> _parameters = [];
     private string _orderByClause = "";
     private int _parameterCounter = 0;
-
-    public QueryBuilder()
-    {
-        _metadata = EntityMapper.GetMetadata(typeof(T));
-    }
 
     public QueryBuilder<T> Where(Expression<Func<T, bool>> predicate)
     {
