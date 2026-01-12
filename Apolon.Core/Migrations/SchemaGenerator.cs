@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data.Common;
+﻿using Apolon.Core.DataAccess;
 using Apolon.Core.Mapping;
 
 namespace Apolon.Core.Migrations;
@@ -161,11 +159,11 @@ public class Migration001_InitialSchema : Migration
     public override void Up()
     {
         // Create Patient table
-        ExecuteSql(SchemaGenerator.GenerateCreateTableSql(typeof(Patient)));
-        ExecuteSql(SchemaGenerator.GenerateCreateTableSql(typeof(Checkup)));
-        ExecuteSql(SchemaGenerator.GenerateCreateTableSql(typeof(Medication)));
-        ExecuteSql(SchemaGenerator.GenerateCreateTableSql(typeof(Prescription)));
-        ExecuteSql(SchemaGenerator.GenerateCreateTableSql(typeof(CheckupType)));
+        // ExecuteSql(SchemaGenerator.GenerateCreateTableSql(typeof(Patient)));
+        // ExecuteSql(SchemaGenerator.GenerateCreateTableSql(typeof(Checkup)));
+        // ExecuteSql(SchemaGenerator.GenerateCreateTableSql(typeof(Medication)));
+        // ExecuteSql(SchemaGenerator.GenerateCreateTableSql(typeof(Prescription)));
+        // ExecuteSql(SchemaGenerator.GenerateCreateTableSql(typeof(CheckupType)));
     }
 
     public override void Down()

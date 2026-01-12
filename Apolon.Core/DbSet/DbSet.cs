@@ -6,27 +6,22 @@ using System.Threading.Tasks;
 using Apolon.Core.Mapping;
 using Apolon.Core.Query;
 using Apolon.Core.DataAccess;
+using Npgsql;
 
 namespace Apolon.Core.DbSet;
 
-public class DbSet<T> : IEnumerable<T> where T : class
+public class DbSet<T>(DbConnection connection) : IEnumerable<T>
+    where T : class
 {
-    private readonly DbConnection _connection;
-    private readonly EntityMetadata _metadata;
+    private readonly EntityMetadata _metadata = EntityMapper.GetMetadata(typeof(T));
     private readonly List<T> _localCache = new();
-    private readonly ChangeTracker _changeTracker;
-
-    public DbSet(DbConnection connection)
-    {
-        _connection = connection;
-        _metadata = EntityMapper.GetMetadata(typeof(T));
-        _changeTracker = new ChangeTracker();
-    }
+    private readonly ChangeTracker _changeTracker = new();
 
     // CREATE
     public void Add(T entity)
     {
-        if (entity == null) throw new ArgumentNullException(nameof(entity));
+        ArgumentNullException.ThrowIfNull(entity);
+        
         _localCache.Add(entity);
         _changeTracker.TrackNew(entity);
     }
@@ -83,19 +78,18 @@ public class DbSet<T> : IEnumerable<T> where T : class
         // Insert new entities
         foreach (var entity in _changeTracker.NewEntities)
         {
-            affectedRows += InsertEntity(entity);
-        }
+            affectedRows += InsertEntity((T)entity);   }
 
         // Update modified entities
         foreach (var entity in _changeTracker.ModifiedEntities)
         {
-            affectedRows += UpdateEntity(entity);
+            affectedRows += UpdateEntity((T)entity);
         }
 
         // Delete removed entities
         foreach (var entity in _changeTracker.DeletedEntities)
         {
-            affectedRows += DeleteEntity(entity);
+            affectedRows += DeleteEntity((T)entity);
         }
 
         _changeTracker.Clear();
@@ -110,7 +104,7 @@ public class DbSet<T> : IEnumerable<T> where T : class
 
         var sql = $"INSERT INTO {_metadata.Schema}.{_metadata.TableName} ({columnNames}) VALUES ({paramNames})";
 
-        var command = _connection.CreateCommand(sql);
+        var command = connection.CreateCommand(sql);
         var i = 0;
         foreach (var column in columns)
         {
@@ -118,7 +112,7 @@ public class DbSet<T> : IEnumerable<T> where T : class
             command.Parameters.AddWithValue($"@p{i++}", TypeMapper.ConvertToDb(value));
         }
 
-        return _connection.ExecuteNonQuery(command);
+        return connection.ExecuteNonQuery(command);
     }
 
     private int UpdateEntity(T entity)
@@ -130,7 +124,7 @@ public class DbSet<T> : IEnumerable<T> where T : class
         var setClause = string.Join(", ", columns.Select((c, i) => $"{c.ColumnName} = @p{i}"));
         var sql = $"UPDATE {_metadata.Schema}.{_metadata.TableName} SET {setClause} WHERE {pk.ColumnName} = @pk";
 
-        var command = _connection.CreateCommand(sql);
+        var command = connection.CreateCommand(sql);
         var i = 0;
         foreach (var column in columns)
         {
@@ -139,7 +133,7 @@ public class DbSet<T> : IEnumerable<T> where T : class
         }
         command.Parameters.AddWithValue("@pk", pkValue);
 
-        return _connection.ExecuteNonQuery(command);
+        return connection.ExecuteNonQuery(command);
     }
 
     private int DeleteEntity(T entity)
@@ -148,23 +142,23 @@ public class DbSet<T> : IEnumerable<T> where T : class
         var pkValue = pk.Property.GetValue(entity);
         var sql = $"DELETE FROM {_metadata.Schema}.{_metadata.TableName} WHERE {pk.ColumnName} = @pk";
 
-        var command = _connection.CreateCommand(sql);
+        var command = connection.CreateCommand(sql);
         command.Parameters.AddWithValue("@pk", pkValue);
 
-        return _connection.ExecuteNonQuery(command);
+        return connection.ExecuteNonQuery(command);
     }
 
     // Helper: Execute query
     private List<T> ToList(string sql, List<ParameterMapping> parameters)
     {
-        var command = _connection.CreateCommand(sql);
+        var command = connection.CreateCommand(sql);
         foreach (var param in parameters)
         {
             command.Parameters.AddWithValue(param.Name, param.Value ?? DBNull.Value);
         }
 
         var result = new List<T>();
-        using (var reader = _connection.ExecuteReader(command))
+        using (var reader = connection.ExecuteReader(command))
         {
             while (reader.Read())
             {
