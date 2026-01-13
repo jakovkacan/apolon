@@ -1,20 +1,28 @@
 ﻿using System.Collections;
+using System.Data.Common;
 using System.Linq.Expressions;
 using System.Reflection;
 using Apolon.Core.Attributes;
-using Apolon.Core.Mapping;
-using Apolon.Core.Query;
 using Apolon.Core.DataAccess;
+using Apolon.Core.Mapping;
+using Apolon.Core.SqlBuilders;
 using Npgsql;
 
 namespace Apolon.Core.DbSet;
 
-public class DbSet<T>(DbConnection connection) : IEnumerable<T>
+public class DbSet<T> : IEnumerable<T>
     where T : class
 {
+    private readonly IDbConnection _connection;
     private readonly EntityMetadata _metadata = EntityMapper.GetMetadata(typeof(T));
     private readonly List<T> _localCache = [];
     private readonly ChangeTracker _changeTracker = new();
+    private readonly CommandBuilder<T> _commandBuilder = new();
+
+    internal DbSet(IDbConnection connection)
+    {
+        _connection = connection;
+    }
 
     // CREATE
     public void Add(T entity)
@@ -23,12 +31,6 @@ public class DbSet<T>(DbConnection connection) : IEnumerable<T>
 
         _localCache.Add(entity);
         _changeTracker.TrackNew(entity);
-    }
-
-    public async Task AddAsync(T entity)
-    {
-        Add(entity);
-        await Task.CompletedTask;
     }
 
     // READ
@@ -58,15 +60,13 @@ public class DbSet<T>(DbConnection connection) : IEnumerable<T>
 
     public List<T> ToList()
     {
-        var columns = string.Join(", ", _metadata.Columns.Select(c => c.ColumnName));
-        var sql = $"SELECT {columns} FROM {_metadata.Schema}.{_metadata.TableName}";
-
-        return ExecuteSql(sql, []);
+        var qb = new QueryBuilder<T>();
+        return ExecuteSql(qb.Build(), qb.GetParameters());
     }
 
-    public async Task<List<T>> ToListAsync()
+    public Task<List<T>> ToListAsync()
     {
-        return await Task.FromResult(ToList());
+        return Task.FromResult(ToList());
     }
 
     public List<T> Include(params Expression<Func<T, object>>[] includeProperties)
@@ -128,20 +128,20 @@ public class DbSet<T>(DbConnection connection) : IEnumerable<T>
         if (entityIds.Count == 0)
             return;
 
-        // Build query: SELECT * FROM related_table WHERE foreign_key_column IN (@ids)
-        var columns = string.Join(", ", relatedMetadata.Columns.Select(c => c.ColumnName));
-        var sql = $"SELECT {columns} FROM {relatedMetadata.Schema}.{relatedMetadata.TableName} " +
-                  $"WHERE {foreignKeyColumn.ColumnName} = ANY(@ids)";
+        // SELECT * FROM related_table WHERE foreign_key_column IN (@ids)
+        var qb = GetQueryBuilderForType(relatedType);
 
-        var command = connection.CreateCommand(sql);
-        var idsArray = entityIds.ToArray();
-        var parameter = command.Parameters.Add("@ids", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.Integer);
-        parameter.Value = idsArray;
+        qb.WhereRaw($"{foreignKeyColumn.ColumnName} = ANY({{0}})", entityIds.ToArray());
 
+        var command = _connection.CreateCommand(qb.Build());
+        foreach (var param in qb.GetParameters())
+        {
+            _connection.AddParameter(command, param.Name, param.Value);
+        }
 
         var relatedEntities = new Dictionary<object, List<object>>();
 
-        using (var reader = connection.ExecuteReader(command))
+        using (var reader = _connection.ExecuteReader(command))
         {
             while (reader.Read())
             {
@@ -160,18 +160,17 @@ public class DbSet<T>(DbConnection connection) : IEnumerable<T>
         {
             var entityId = primaryKey.Property.GetValue(entity);
 
-            if (relatedEntities.TryGetValue(entityId, out var related))
+            if (entityId == null || !relatedEntities.TryGetValue(entityId, out var related)) continue;
+
+            var collectionType = typeof(List<>).MakeGenericType(relatedType);
+            var collection = Activator.CreateInstance(collectionType);
+
+            foreach (var item in related)
             {
-                var collectionType = typeof(List<>).MakeGenericType(relatedType);
-                var collection = Activator.CreateInstance(collectionType);
-
-                foreach (var item in related)
-                {
-                    collectionType.GetMethod("Add").Invoke(collection, new[] { item });
-                }
-
-                navigationProperty.SetValue(entity, collection);
+                collectionType.GetMethod("Add")?.Invoke(collection, [item]);
             }
+
+            navigationProperty.SetValue(entity, collection);
         }
     }
 
@@ -192,22 +191,22 @@ public class DbSet<T>(DbConnection connection) : IEnumerable<T>
             .Distinct()
             .ToList();
 
-        if (!relatedIds.Any())
+        if (relatedIds.Count == 0)
             return;
 
-        var columns = string.Join(", ", relatedMetadata.Columns.Select(c => c.ColumnName));
-        var sql = $"SELECT {columns} FROM {relatedMetadata.Schema}.{relatedMetadata.TableName} " +
-                  $"WHERE {relatedMetadata.PrimaryKey.ColumnName} = ANY(@ids)";
+        var qb = GetQueryBuilderForType(relatedType);
 
-        var command = connection.CreateCommand(sql);
-        var idsArray = relatedIds.ToArray();
-        var parameter = command.Parameters.Add("@ids", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.Integer);
-        parameter.Value = idsArray;
+        qb.WhereRaw($"{relatedMetadata.PrimaryKey.ColumnName} = ANY({{0}})", relatedIds.ToArray());
 
+        DbCommand command = _connection.CreateCommand(qb.Build());
+        foreach (ParameterMapping param in qb.GetParameters())
+        {
+            _connection.AddParameter(command, param.Name, param.Value);
+        }
 
         var relatedEntities = new Dictionary<object, object>();
 
-        using (var reader = connection.ExecuteReader(command))
+        using (var reader = _connection.ExecuteReader(command))
         {
             while (reader.Read())
             {
@@ -228,19 +227,10 @@ public class DbSet<T>(DbConnection connection) : IEnumerable<T>
         }
     }
 
-    private object MapRelatedEntity(NpgsqlDataReader reader, EntityMetadata metadata)
+    private static dynamic GetQueryBuilderForType(Type entityType)
     {
-        var entity = Activator.CreateInstance(metadata.EntityType);
-
-        foreach (var column in metadata.Columns)
-        {
-            var ordinal = reader.GetOrdinal(column.ColumnName);
-            var value = reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);
-            var convertedValue = TypeMapper.ConvertFromDb(value, column.Property.PropertyType);
-            column.Property.SetValue(entity, convertedValue);
-        }
-
-        return entity;
+        var queryBuilderType = typeof(QueryBuilder<>).MakeGenericType(entityType);
+        return Activator.CreateInstance(queryBuilderType)!;
     }
 
 
@@ -266,25 +256,9 @@ public class DbSet<T>(DbConnection connection) : IEnumerable<T>
     // SAVE
     public int SaveChanges()
     {
-        var affectedRows = 0;
-
-        // Insert new entities
-        foreach (var entity in _changeTracker.NewEntities)
-        {
-            affectedRows += InsertEntity((T)entity);
-        }
-
-        // Update modified entities
-        foreach (var entity in _changeTracker.ModifiedEntities)
-        {
-            affectedRows += UpdateEntity((T)entity);
-        }
-
-        // Delete removed entities
-        foreach (var entity in _changeTracker.DeletedEntities)
-        {
-            affectedRows += DeleteEntity((T)entity);
-        }
+        var affectedRows = _changeTracker.NewEntities.Sum(entity => InsertEntity((T)entity))
+                           + _changeTracker.ModifiedEntities.Sum(entity => UpdateEntity((T)entity))
+                           + _changeTracker.DeletedEntities.Sum(entity => DeleteEntity((T)entity));
 
         _changeTracker.Clear();
         return affectedRows;
@@ -292,68 +266,52 @@ public class DbSet<T>(DbConnection connection) : IEnumerable<T>
 
     private int InsertEntity(T entity)
     {
-        var columns = _metadata.Columns.Where(c => c.PropertyName != _metadata.PrimaryKey.PropertyName);
-        var columnNames = string.Join(", ", columns.Select(c => c.ColumnName));
-        var paramNames = string.Join(", ", columns.Select((_, i) => $"@p{i}"));
+        var (sql, values) = _commandBuilder.BuildInsert(entity);
+        var command = _connection.CreateCommand(sql);
 
-        var sql = $"INSERT INTO {_metadata.Schema}.{_metadata.TableName} ({columnNames}) VALUES ({paramNames})";
-
-        var command = connection.CreateCommand(sql);
-        var i = 0;
-        foreach (var column in columns)
+        for (var i = 0; i < values.Count; i++)
         {
-            var value = column.Property.GetValue(entity);
-            command.Parameters.AddWithValue($"@p{i++}", TypeMapper.ConvertToDb(value));
+            _connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
         }
 
-        return connection.ExecuteNonQuery(command);
+        return _connection.ExecuteNonQuery(command);
     }
 
     private int UpdateEntity(T entity)
     {
-        var pk = _metadata.PrimaryKey;
-        var pkValue = pk.Property.GetValue(entity);
-        var columns = _metadata.Columns.Where(c => c.PropertyName != pk.PropertyName);
+        var (sql, values, pkValue) = _commandBuilder.BuildUpdate(entity);
+        var command = _connection.CreateCommand(sql);
 
-        var setClause = string.Join(", ", columns.Select((c, i) => $"{c.ColumnName} = @p{i}"));
-        var sql = $"UPDATE {_metadata.Schema}.{_metadata.TableName} SET {setClause} WHERE {pk.ColumnName} = @pk";
-
-        var command = connection.CreateCommand(sql);
-        var i = 0;
-        foreach (var column in columns)
+        for (var i = 0; i < values.Count; i++)
         {
-            var value = column.Property.GetValue(entity);
-            command.Parameters.AddWithValue($"@p{i++}", TypeMapper.ConvertToDb(value));
+            _connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
         }
 
-        command.Parameters.AddWithValue("@pk", pkValue);
+        _connection.AddParameter(command, "@pk", pkValue);
 
-        return connection.ExecuteNonQuery(command);
+        return _connection.ExecuteNonQuery(command);
     }
 
     private int DeleteEntity(T entity)
     {
-        var pk = _metadata.PrimaryKey;
-        var pkValue = pk.Property.GetValue(entity);
-        var sql = $"DELETE FROM {_metadata.Schema}.{_metadata.TableName} WHERE {pk.ColumnName} = @pk";
+        var (sql, pkValue) = _commandBuilder.BuildDelete(entity);
 
-        var command = connection.CreateCommand(sql);
-        command.Parameters.AddWithValue("@pk", pkValue);
+        var command = _connection.CreateCommand(sql);
+        _connection.AddParameter(command, "@pk", pkValue);
 
-        return connection.ExecuteNonQuery(command);
+        return _connection.ExecuteNonQuery(command);
     }
 
-    // Helper: Execute query
     private List<T> ExecuteSql(string sql, List<ParameterMapping> parameters)
     {
-        var command = connection.CreateCommand(sql);
+        var command = _connection.CreateCommand(sql);
         foreach (var param in parameters)
         {
-            command.Parameters.AddWithValue(param.Name, param.Value ?? DBNull.Value);
+            _connection.AddParameter(command, param.Name, param.Value);
         }
 
         var result = new List<T>();
-        using var reader = connection.ExecuteReader(command);
+        using var reader = _connection.ExecuteReader(command);
 
         while (reader.Read())
         {
@@ -363,11 +321,26 @@ public class DbSet<T>(DbConnection connection) : IEnumerable<T>
         return result;
     }
 
-    private T MapEntity(NpgsqlDataReader reader)
+    private T MapEntity(DbDataReader reader)
     {
-        var entity = (T)Activator.CreateInstance(typeof(T));
+        var entity = Activator.CreateInstance<T>();
 
         foreach (var column in _metadata.Columns)
+        {
+            var ordinal = reader.GetOrdinal(column.ColumnName);
+            var value = reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);
+            var convertedValue = TypeMapper.ConvertFromDb(value, column.Property.PropertyType);
+            column.Property.SetValue(entity, convertedValue);
+        }
+
+        return entity;
+    }
+    
+    private static object MapRelatedEntity(DbDataReader reader, EntityMetadata metadata)
+    {
+        var entity = Activator.CreateInstance(metadata.EntityType)!;
+
+        foreach (var column in metadata.Columns)
         {
             var ordinal = reader.GetOrdinal(column.ColumnName);
             var value = reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);

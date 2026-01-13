@@ -4,17 +4,43 @@ using Apolon.Models;
 const string connectionString =
     "Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=apolon;";
 
-var context = new ApolonDbContext(connectionString);
+var context = new ApolonDbContext(connectionString, false);
 try
 {
+    Console.WriteLine("Connecting to database...");
+    
+    await context.Database.OpenConnectionAsync();
+    
     Console.WriteLine("Connected to database.");
-
+    
+    Console.WriteLine("PATIENTS");
+    var patients = context.Patients.ToList();
+    patients.ForEach(Console.WriteLine);
+    
+    Console.WriteLine("CHECKUPS");
     var checkups = context.Checkups.Include(c => c.CheckupType, c => c.Patient).ToList();
-    foreach (var checkup in checkups)
-    {
-        Console.WriteLine(
-            $"Checkup: Patient Name: {checkup.Patient.FirstName} {checkup.Patient.LastName}, Checkup Type: {checkup.CheckupType.TypeCode}, CheckupDate: {checkup.CheckupDate}, Notes: {checkup.Notes}, Results: {checkup.Results}");
-    }
+    checkups.ForEach(checkup => {
+        Console.WriteLine($"{checkup} for {checkup.Patient}");
+    });
+    
+    Console.WriteLine("MEDICATIONS");
+    var medications = context.Medications.ToList();
+    medications.ForEach(Console.WriteLine);
+    
+    Console.WriteLine("PRESCRIPTIONS");
+    var prescriptions = context.Prescriptions.ToList();
+    prescriptions.ForEach(Console.WriteLine);
+    
+    Console.WriteLine("DONE");
+    
+    // context.Database.EnsureCreated();
+
+    // var checkups = context.Checkups.Include(c => c.CheckupType, c => c.Patient).ToList();
+    // foreach (var checkup in checkups)
+    // {
+    //     Console.WriteLine(
+    //         $"Checkup: Patient Name: {checkup.Patient.FirstName} {checkup.Patient.LastName}, Checkup Type: {checkup.CheckupType.TypeCode}, CheckupDate: {checkup.CheckupDate}, Notes: {checkup.Notes}, Results: {checkup.Results}");
+    // }
 
     // var checkup2 = new Checkup { PatientId = 1, CheckupTypeId = 1, CheckupDate = DateTime.Now.Subtract(TimeSpan.FromDays(30)), Notes = "Regular checkup", Results = "It's over guys" };
     // context.Checkups.Add(checkup2);
@@ -101,9 +127,3 @@ finally
 {
     context.Dispose();
 }
-
-// Query using generic ORM capabilities
-// var patients = context.Patients
-//     .Query()
-//     .Where(p => p.FirstName == "John")
-//     .ToList();

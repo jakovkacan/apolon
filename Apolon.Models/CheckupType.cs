@@ -15,4 +15,7 @@ public class CheckupType
     public string Description { get; set; }
 
     // Seed data: GP, BLOOD, X-RAY, CT, MRI, ULTRA, EKG, ECHO, EYE, DERM, DENTA, MAMMO, EEG
+
+    public override string ToString() =>
+        $"{nameof(Id)}: {Id}, {nameof(TypeCode)}: {TypeCode}, {nameof(Description)}: {Description}";
 }

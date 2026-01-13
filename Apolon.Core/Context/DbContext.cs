@@ -1,25 +1,40 @@
 ﻿using Apolon.Core.DataAccess;
 using Apolon.Core.DbSet;
+using Apolon.Core.Infrastructure;
 
 namespace Apolon.Core.Context;
 
 public abstract class DbContext : IDisposable
 {
-    private readonly DbConnection _connection;
+    private readonly DbConnectionNpgsql _connection;
     private readonly Dictionary<Type, object> _dbSets = new();
+    private readonly DatabaseFacade _database;
+    private bool _disposed;
+    
 
-    protected DbContext(string connectionString)
+    protected DbContext(string connectionString, bool openConnection = true)
     {
-        _connection = new DbConnection(connectionString);
-        _connection.Open();
+        _connection = new DbConnectionNpgsql(connectionString);
+        _connection.OpenConnection();
+        _database = new DatabaseFacade(_connection);
+        _disposed = false;
+    }
+
+    public virtual DatabaseFacade Database
+    {
+        get
+        {
+            CheckDisposed();
+            return _database;
+        }
     }
 
     // Generic DbSet accessor
-    public DbSet<T> Set<T>() where T : class
+    protected DbSet<T> Set<T>() where T : class
     {
         var type = typeof(T);
         if (_dbSets.TryGetValue(type, out var value)) return (DbSet<T>)value;
-        
+
         value = new DbSet<T>(_connection);
         _dbSets[type] = value;
         return (DbSet<T>)value;
@@ -34,7 +49,7 @@ public abstract class DbContext : IDisposable
             var saveMethod = dbSet.GetType().GetMethod("SaveChanges");
             try
             {
-                total += (int)saveMethod.Invoke(dbSet, null);
+                total += (int)(saveMethod?.Invoke(dbSet, null) ?? throw new InvalidOperationException());
             }
             catch (Exception e)
             {
@@ -42,12 +57,22 @@ public abstract class DbContext : IDisposable
                 throw;
             }
         }
+
         return total;
     }
-
-    public void BeginTransaction() => _connection.BeginTransaction();
-    public void CommitTransaction() => _connection.CommitTransaction();
-    public void RollbackTransaction() => _connection.RollbackTransaction();
     
-    public void Dispose() => _connection?.Dispose();
+    private void CheckDisposed()
+    {
+        if (!_disposed) return;
+        throw new ObjectDisposedException(nameof(DbContext));
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        
+        _disposed = true;
+        _connection?.Dispose();
+        GC.SuppressFinalize(this);
+    }
 }

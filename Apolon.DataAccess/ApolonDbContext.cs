@@ -4,7 +4,8 @@ using Apolon.Models;
 
 namespace Apolon.DataAccess;
 
-public class ApolonDbContext(string connectionString) : DbContext(connectionString) // Inherits generic DbContext
+public class ApolonDbContext(string connectionString, bool openConnection = true)
+    : DbContext(connectionString, openConnection)
 {
     // Domain-specific DbSets exposed as properties
     public DbSet<Patient> Patients => Set<Patient>();

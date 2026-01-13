@@ -28,4 +28,7 @@ public class Patient : BaseEntity
 
     // Navigation properties
     public ICollection<Checkup> Checkups { get; set; } = new List<Checkup>();
+
+    public override string ToString() =>
+        $"{nameof(FirstName)}: {FirstName}, {nameof(LastName)}: {LastName}, {nameof(Email)}: {Email}, {nameof(PhoneNumber)}: {PhoneNumber}, {nameof(DateOfBirth)}: {DateOfBirth}, {nameof(Gender)}: {Gender}, {nameof(Address)}: {Address}";
 }

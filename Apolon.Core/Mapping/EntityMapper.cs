@@ -1,13 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
+﻿using System.Reflection;
 using Apolon.Core.Attributes;
 using Apolon.Core.Exceptions;
 
 namespace Apolon.Core.Mapping;
 
-public class EntityMapper
+internal static class EntityMapper
 {
     private static readonly Dictionary<Type, EntityMetadata> MetadataCache = new();
 
@@ -17,7 +14,8 @@ public class EntityMapper
             return cached;
 
         var tableAttr = entityType.GetCustomAttribute<TableAttribute>()
-                        ?? throw new MappingException($"Type {entityType.Name} must be decorated with [Table]");
+                        ?? throw new MappingException(
+                            $"Type {entityType.Name} must be annotated with [Table] attribute");
 
         var metadata = new EntityMetadata
         {
@@ -40,18 +38,20 @@ public class EntityMapper
 
         foreach (var prop in entityType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
-            // Skip navigation properties (ICollection, non-primitive types)
+            // skip navigation properties 
             if (prop.PropertyType.IsGenericType &&
                 prop.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>))
                 continue;
 
-            if (!IsPrimitiveOrSimpleType(prop.PropertyType))
+            if (!MapperUtils.IsPrimitiveOrSimpleType(prop.PropertyType))
                 continue;
 
             var columnAttr = prop.GetCustomAttribute<ColumnAttribute>();
-            var columnName = columnAttr?.Name ?? ConvertPascalToSnakeCase(prop.Name);
+            var columnName = columnAttr?.Name ?? MapperUtils.ConvertPascalToSnakeCase(prop.Name);
             var dbType = columnAttr?.DbType ?? TypeMapper.GetPostgresType(prop.PropertyType);
-            var isNullable = columnAttr?.IsNullable ?? true;
+            var isNullable = columnAttr?.IsNullable ?? 
+                             (!prop.PropertyType.IsValueType ||
+                              Nullable.GetUnderlyingType(prop.PropertyType) != null);
             var defaultValue = columnAttr?.DefaultValue;
             var isUnique = columnAttr?.IsUnique ?? false;
 
@@ -132,7 +132,7 @@ public class EntityMapper
                 });
             }
             // Many-to-1 or 1-to-1: direct reference
-            else if (IsPersistentType(prop.PropertyType))
+            else if (MapperUtils.IsPersistentType(prop.PropertyType))
             {
                 // Determine if FK property exists with matching name
                 var fkProp = entityType.GetProperty(prop.Name + "Id");
@@ -142,7 +142,7 @@ public class EntityMapper
                     {
                         PropertyName = prop.Name,
                         RelatedType = prop.PropertyType,
-                        Cardinality = RelationshipCardinality.ManyToOne, // or OneToOne
+                        Cardinality = RelationshipCardinality.ManyToOne,
                         ForeignKeyProperty = fkProp.Name,
                         Property = prop
                     });
@@ -151,41 +151,5 @@ public class EntityMapper
         }
 
         return relationships;
-    }
-
-    private static bool IsPrimitiveOrSimpleType(Type type)
-    {
-        return type.IsPrimitive || type == typeof(string) || type == typeof(DateTime) ||
-               type == typeof(decimal) || type == typeof(Guid) ||
-               (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>));
-    }
-
-    private static bool IsPersistentType(Type type)
-    {
-        return type.GetCustomAttribute<TableAttribute>() != null;
-    }
-
-    private static string ConvertPascalToSnakeCase(string pascalCase)
-    {
-        if (string.IsNullOrEmpty(pascalCase))
-            return pascalCase;
-
-        var result = new System.Text.StringBuilder();
-        result.Append(char.ToLower(pascalCase[0]));
-
-        for (var i = 1; i < pascalCase.Length; i++)
-        {
-            if (char.IsUpper(pascalCase[i]))
-            {
-                result.Append('_');
-                result.Append(char.ToLower(pascalCase[i]));
-            }
-            else
-            {
-                result.Append(pascalCase[i]);
-            }
-        }
-
-        return result.ToString();
     }
 }

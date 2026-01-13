@@ -15,11 +15,14 @@ public class Prescription : BaseEntity
 
     public decimal Dosage { get; set; }
     public string DosageUnit { get; set; } // mg, ml, tablet, etc.
-    public string Frequency { get; set; }  // Once daily, twice daily, etc.
+    public string Frequency { get; set; } // Once daily, twice daily, etc.
     public DateTime StartDate { get; set; }
     public DateTime? EndDate { get; set; } // Optional - null means ongoing
 
     // Navigation properties
     public Checkup Checkup { get; set; }
     public Medication Medication { get; set; }
+
+    public override string ToString() =>
+        $"{nameof(CheckupId)}: {CheckupId}, {nameof(MedicationId)}: {MedicationId}, {nameof(Dosage)}: {Dosage}, {nameof(DosageUnit)}: {DosageUnit}, {nameof(Frequency)}: {Frequency}, {nameof(StartDate)}: {StartDate}, {nameof(EndDate)}: {EndDate}";
 }

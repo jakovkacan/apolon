@@ -1,11 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 using Apolon.Core.Exceptions;
 using Apolon.Core.Mapping;
 
-namespace Apolon.Core.Query;
+namespace Apolon.Core.SqlBuilders;
 
 public class QueryBuilder<T> where T : class
 {
@@ -19,6 +16,14 @@ public class QueryBuilder<T> where T : class
     {
         var sql = TranslateExpression(predicate.Body);
         _whereClauses.Add(sql);
+        return this;
+    }
+    
+    public QueryBuilder<T> WhereRaw(string clause, object parameterValue)
+    {
+        var paramName = AddParameter(parameterValue);
+        // Replace the placeholder in your raw clause with the generated parameter name
+        _whereClauses.Add(clause.Replace("{0}", paramName));
         return this;
     }
 
@@ -57,7 +62,7 @@ public class QueryBuilder<T> where T : class
 
     private string BuildSelectClause()
     {
-        var columns = string.Join(", ", 
+        var columns = string.Join(", ",
             _metadata.Columns.Select(c => $"{c.ColumnName}"));
         return $"SELECT {columns} FROM {_metadata.Schema}.{_metadata.TableName}";
     }

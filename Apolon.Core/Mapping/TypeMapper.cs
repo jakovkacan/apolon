@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using Apolon.Core.Exceptions;
+﻿using Apolon.Core.Exceptions;
 
 namespace Apolon.Core.Mapping;
 
-public class TypeMapper
+public static class TypeMapper
 {
     private static readonly Dictionary<Type, string> CSharpToPostgresTypeMap = new()
     {
@@ -35,27 +33,27 @@ public class TypeMapper
 
     public static string GetPostgresType(Type csharpType)
     {
-        if (csharpType.IsGenericType && csharpType.GetGenericTypeDefinition() == typeof(Nullable<>))
-        {
-            csharpType = Nullable.GetUnderlyingType(csharpType);
-        }
+        // for nullable types
+        var underlyingType = Nullable.GetUnderlyingType(csharpType);
+        
+        csharpType = underlyingType ?? csharpType;
 
         return CSharpToPostgresTypeMap.TryGetValue(csharpType, out var pgType)
             ? pgType
             : throw new OrmException($"Unsupported type: {csharpType.Name}");
     }
 
-    public static object ConvertFromDb(object dbValue, Type targetType)
+    public static object? ConvertFromDb(object? dbValue, Type targetType)
     {
-        if (dbValue == null || dbValue is DBNull)
+        if (dbValue is null or DBNull)
             return null;
 
-        if (targetType.IsGenericType && targetType.GetGenericTypeDefinition() == typeof(Nullable<>))
-        {
-            targetType = Nullable.GetUnderlyingType(targetType);
-        }
+        // for nullable types
+        var underlyingType = Nullable.GetUnderlyingType(targetType);
+        
+        targetType = underlyingType ?? targetType;
 
-        // Handle special conversions
+        // special conversions
         if (targetType == typeof(DateTime) && dbValue is DateTime dt)
             return dt;
 
@@ -64,12 +62,11 @@ public class TypeMapper
 
         if (targetType == typeof(Guid) && dbValue is Guid g)
             return g;
-
-        // Default: convert
+        
         return Convert.ChangeType(dbValue, targetType);
     }
 
-    public static object ConvertToDb(object value)
+    public static object ConvertToDb(object? value)
     {
         return value ?? DBNull.Value;
     }
