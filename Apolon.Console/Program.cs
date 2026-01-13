@@ -1,5 +1,5 @@
-﻿using Apolon.DataAccess;
-using Apolon.Models;
+﻿using Apolon.Core.SqlBuilders;
+using Apolon.DataAccess;
 
 const string connectionString =
     "Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=apolon;";
@@ -33,6 +33,31 @@ try
     
     Console.WriteLine("DONE");
     
+    var query = context.Patients.Query().Where(p => p.PhoneNumber == "0123456789").ToList(context.Patients);
+    query.ForEach(Console.WriteLine);
+    
+    // context.Database.BeginTransaction();
+    //
+    // var patient = new Patient() {
+    //     FirstName = "Despa",
+    //     LastName = "Cito",
+    //     Email = "despacito@mail.com",
+    //     PhoneNumber = "0123456789",
+    //     DateOfBirth = DateTime.Now.AddYears(-20),
+    //     Address = "123 Main St",
+    //     Gender = "Male"
+    // };
+    //
+    // context.Patients.Add(patient);
+    //
+    // context.SaveChanges();
+    //
+    // context.Patients.ToList().ForEach(Console.WriteLine);
+    //
+    // context.Database.RollbackTransaction();
+    //
+    // context.Patients.ToList().ForEach(Console.WriteLine);
+
     // context.Database.EnsureCreated();
 
     // var checkups = context.Checkups.Include(c => c.CheckupType, c => c.Patient).ToList();
@@ -57,9 +82,29 @@ try
     //     }
     // }
 
-    // var patient = new Patient { FirstName = "John", LastName = "Doe", Email = "john.doe@mail.com" };
+    // var patient = new Patient
+    // {
+    //     FirstName = "Ivan", 
+    //     LastName = "Horvat", 
+    //     Email = "ivan.horvat@mail.com",
+    //     PhoneNumber = "0123456789",
+    //     DateOfBirth = DateTime.Now.AddYears(-20),
+    //     Address = "123 Main St",
+    //     Gender = "Male"
+    // };
     // context.Patients.Add(patient);
     // context.SaveChanges();
+    //
+    // var patient = patients.FirstOrDefault(p => p.FirstName == "Ivan");
+    // patient.LastName = "Excusemić";
+    // context.Patients.Update(patient);
+    // context.Patients.SaveChanges();
+    //
+    // context.SaveChanges();
+    
+    // context.SaveChanges();
+    
+    // context.Patients.ToList().ForEach(Console.WriteLine);
 
     // var type = new CheckupType { TypeCode = "X-RAY", Description = "X-Ray" };
     //

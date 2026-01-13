@@ -21,7 +21,7 @@ public interface IDbConnection : IDisposable
 
     public int ExecuteNonQuery(DbCommand command);
 
-    public object ExecuteScalar(DbCommand command);
+    public object? ExecuteScalar(DbCommand command);
 
     public void BeginTransaction();
 

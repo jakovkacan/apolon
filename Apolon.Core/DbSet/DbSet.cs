@@ -16,12 +16,13 @@ public class DbSet<T> : IEnumerable<T>
     private readonly IDbConnection _connection;
     private readonly EntityMetadata _metadata = EntityMapper.GetMetadata(typeof(T));
     private readonly List<T> _localCache = [];
+    private readonly EntityExecutor _executor;
     private readonly ChangeTracker _changeTracker = new();
-    private readonly CommandBuilder<T> _commandBuilder = new();
 
     internal DbSet(IDbConnection connection)
     {
         _connection = connection;
+        _executor = new EntityExecutor(connection);
     }
 
     // CREATE
@@ -34,13 +35,12 @@ public class DbSet<T> : IEnumerable<T>
     }
 
     // READ
-    public T Find(int id)
+    public T? Find(int id)
     {
-        var query = new QueryBuilder<T>()
-            .Where(e => (int)e.GetType().GetProperty(_metadata.PrimaryKey.PropertyName)
+        var query = Query().Where(e => (int)e.GetType().GetProperty(_metadata.PrimaryKey.PropertyName)
                 .GetValue(e) == id);
 
-        return ExecuteSql(query.Build(), query.GetParameters()).FirstOrDefault();
+        return _executor.Query(query).FirstOrDefault();
     }
 
     public IQueryable<T> AsQueryable()
@@ -52,17 +52,13 @@ public class DbSet<T> : IEnumerable<T>
     {
         return new QueryBuilder<T>();
     }
-
-    public List<T> ExecuteQuery(QueryBuilder<T> query)
+    
+    public List<T> ExecuteQuery(QueryBuilder<T> queryBuilder)
     {
-        return ExecuteSql(query.Build(), query.GetParameters());
+        return _executor.Query(queryBuilder);
     }
 
-    public List<T> ToList()
-    {
-        var qb = new QueryBuilder<T>();
-        return ExecuteSql(qb.Build(), qb.GetParameters());
-    }
+    public List<T> ToList() => _executor.Query(new QueryBuilder<T>());
 
     public Task<List<T>> ToListAsync()
     {
@@ -145,7 +141,7 @@ public class DbSet<T> : IEnumerable<T>
         {
             while (reader.Read())
             {
-                var relatedEntity = MapRelatedEntity(reader, relatedMetadata);
+                var relatedEntity = EntityExecutor.MapEntity(reader, relatedMetadata);
                 var foreignKeyValue = foreignKeyColumn.Property.GetValue(relatedEntity);
 
                 if (!relatedEntities.ContainsKey(foreignKeyValue))
@@ -210,8 +206,8 @@ public class DbSet<T> : IEnumerable<T>
         {
             while (reader.Read())
             {
-                var relatedEntity = MapRelatedEntity(reader, relatedMetadata);
-                var id = relatedMetadata.PrimaryKey.Property.GetValue(relatedEntity);
+                var relatedEntity = EntityExecutor.MapEntity(reader, relatedMetadata);
+                var id = relatedMetadata.PrimaryKey.Property.GetValue(relatedEntity) ?? throw new Exception("Primary key is null");
                 relatedEntities[id] = relatedEntity;
             }
         }
@@ -256,100 +252,100 @@ public class DbSet<T> : IEnumerable<T>
     // SAVE
     public int SaveChanges()
     {
-        var affectedRows = _changeTracker.NewEntities.Sum(entity => InsertEntity((T)entity))
-                           + _changeTracker.ModifiedEntities.Sum(entity => UpdateEntity((T)entity))
-                           + _changeTracker.DeletedEntities.Sum(entity => DeleteEntity((T)entity));
+        var affectedRows = _changeTracker.NewEntities.Sum(entity => _executor.Insert((T)entity))
+                           + _changeTracker.ModifiedEntities.Sum(entity => _executor.Update((T)entity))
+                           + _changeTracker.DeletedEntities.Sum(entity => _executor.Delete((T)entity));
 
         _changeTracker.Clear();
         return affectedRows;
     }
 
-    private int InsertEntity(T entity)
-    {
-        var (sql, values) = _commandBuilder.BuildInsert(entity);
-        var command = _connection.CreateCommand(sql);
-
-        for (var i = 0; i < values.Count; i++)
-        {
-            _connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
-        }
-
-        return _connection.ExecuteNonQuery(command);
-    }
-
-    private int UpdateEntity(T entity)
-    {
-        var (sql, values, pkValue) = _commandBuilder.BuildUpdate(entity);
-        var command = _connection.CreateCommand(sql);
-
-        for (var i = 0; i < values.Count; i++)
-        {
-            _connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
-        }
-
-        _connection.AddParameter(command, "@pk", pkValue);
-
-        return _connection.ExecuteNonQuery(command);
-    }
-
-    private int DeleteEntity(T entity)
-    {
-        var (sql, pkValue) = _commandBuilder.BuildDelete(entity);
-
-        var command = _connection.CreateCommand(sql);
-        _connection.AddParameter(command, "@pk", pkValue);
-
-        return _connection.ExecuteNonQuery(command);
-    }
-
-    private List<T> ExecuteSql(string sql, List<ParameterMapping> parameters)
-    {
-        var command = _connection.CreateCommand(sql);
-        foreach (var param in parameters)
-        {
-            _connection.AddParameter(command, param.Name, param.Value);
-        }
-
-        var result = new List<T>();
-        using var reader = _connection.ExecuteReader(command);
-
-        while (reader.Read())
-        {
-            result.Add(MapEntity(reader));
-        }
-
-        return result;
-    }
-
-    private T MapEntity(DbDataReader reader)
-    {
-        var entity = Activator.CreateInstance<T>();
-
-        foreach (var column in _metadata.Columns)
-        {
-            var ordinal = reader.GetOrdinal(column.ColumnName);
-            var value = reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);
-            var convertedValue = TypeMapper.ConvertFromDb(value, column.Property.PropertyType);
-            column.Property.SetValue(entity, convertedValue);
-        }
-
-        return entity;
-    }
-    
-    private static object MapRelatedEntity(DbDataReader reader, EntityMetadata metadata)
-    {
-        var entity = Activator.CreateInstance(metadata.EntityType)!;
-
-        foreach (var column in metadata.Columns)
-        {
-            var ordinal = reader.GetOrdinal(column.ColumnName);
-            var value = reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);
-            var convertedValue = TypeMapper.ConvertFromDb(value, column.Property.PropertyType);
-            column.Property.SetValue(entity, convertedValue);
-        }
-
-        return entity;
-    }
+    // private int InsertEntity(T entity)
+    // {
+    //     var (sql, values) = _commandBuilder.BuildInsert(entity);
+    //     var command = _connection.CreateCommand(sql);
+    //
+    //     for (var i = 0; i < values.Count; i++)
+    //     {
+    //         _connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
+    //     }
+    //
+    //     return _connection.ExecuteNonQuery(command);
+    // }
+    //
+    // private int UpdateEntity(T entity)
+    // {
+    //     var (sql, values, pkValue) = _commandBuilder.BuildUpdate(entity);
+    //     var command = _connection.CreateCommand(sql);
+    //
+    //     for (var i = 0; i < values.Count; i++)
+    //     {
+    //         _connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
+    //     }
+    //
+    //     _connection.AddParameter(command, "@pk", pkValue);
+    //
+    //     return _connection.ExecuteNonQuery(command);
+    // }
+    //
+    // private int DeleteEntity(T entity)
+    // {
+    //     var (sql, pkValue) = _commandBuilder.BuildDelete(entity);
+    //
+    //     var command = _connection.CreateCommand(sql);
+    //     _connection.AddParameter(command, "@pk", pkValue);
+    //
+    //     return _connection.ExecuteNonQuery(command);
+    // }
+    //
+    // private List<T> ExecuteSql(string sql, List<ParameterMapping> parameters)
+    // {
+    //     var command = _connection.CreateCommand(sql);
+    //     foreach (var param in parameters)
+    //     {
+    //         _connection.AddParameter(command, param.Name, param.Value);
+    //     }
+    //
+    //     var result = new List<T>();
+    //     using var reader = _connection.ExecuteReader(command);
+    //
+    //     while (reader.Read())
+    //     {
+    //         result.Add(MapEntity(reader));
+    //     }
+    //
+    //     return result;
+    // }
+    //
+    // private T MapEntity(DbDataReader reader)
+    // {
+    //     var entity = Activator.CreateInstance<T>();
+    //
+    //     foreach (var column in _metadata.Columns)
+    //     {
+    //         var ordinal = reader.GetOrdinal(column.ColumnName);
+    //         var value = reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);
+    //         var convertedValue = TypeMapper.ConvertFromDb(value, column.Property.PropertyType);
+    //         column.Property.SetValue(entity, convertedValue);
+    //     }
+    //
+    //     return entity;
+    // }
+    //
+    // private static object MapRelatedEntity(DbDataReader reader, EntityMetadata metadata)
+    // {
+    //     var entity = Activator.CreateInstance(metadata.EntityType)!;
+    //
+    //     foreach (var column in metadata.Columns)
+    //     {
+    //         var ordinal = reader.GetOrdinal(column.ColumnName);
+    //         var value = reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);
+    //         var convertedValue = TypeMapper.ConvertFromDb(value, column.Property.PropertyType);
+    //         column.Property.SetValue(entity, convertedValue);
+    //     }
+    //
+    //     return entity;
+    // }
 
     public IEnumerator<T> GetEnumerator() => _localCache.GetEnumerator();
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();

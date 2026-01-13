@@ -9,8 +9,12 @@ public class QueryBuilder<T> where T : class
     private readonly EntityMetadata _metadata = EntityMapper.GetMetadata(typeof(T));
     private readonly List<string> _whereClauses = [];
     private readonly List<ParameterMapping> _parameters = [];
-    private string _orderByClause = "";
+    private readonly List<string> _orderClauses = [];
+    private int? _limit;
+    private int? _offset;
     private int _parameterCounter = 0;
+
+    public List<ParameterMapping> GetParameters() => _parameters;
 
     public QueryBuilder<T> Where(Expression<Func<T, bool>> predicate)
     {
@@ -18,7 +22,13 @@ public class QueryBuilder<T> where T : class
         _whereClauses.Add(sql);
         return this;
     }
-    
+
+    public QueryBuilder<T> OrderBy<TKey>(Expression<Func<T, TKey>> keySelector) => AddOrder(keySelector, "ASC");
+
+    public QueryBuilder<T> OrderByDescending<TKey>(Expression<Func<T, TKey>> keySelector) =>
+        AddOrder(keySelector, "DESC");
+
+
     public QueryBuilder<T> WhereRaw(string clause, object parameterValue)
     {
         var paramName = AddParameter(parameterValue);
@@ -27,19 +37,23 @@ public class QueryBuilder<T> where T : class
         return this;
     }
 
-    public QueryBuilder<T> OrderBy<TKey>(Expression<Func<T, TKey>> keySelector)
+    private QueryBuilder<T> AddOrder<TKey>(Expression<Func<T, TKey>> keySelector, string direction)
     {
-        var memberExpr = keySelector.Body as MemberExpression;
-        var columnName = GetColumnName(memberExpr?.Member.Name);
-        _orderByClause = $"ORDER BY {columnName} ASC";
+        var memberExpr = GetMemberExpression(keySelector.Body);
+        var columnName = GetColumnName(memberExpr.Member.Name);
+        _orderClauses.Add($"{columnName} {direction}");
         return this;
     }
 
-    public QueryBuilder<T> ThenByDescending<TKey>(Expression<Func<T, TKey>> keySelector)
+    public QueryBuilder<T> Take(int count)
     {
-        var memberExpr = keySelector.Body as MemberExpression;
-        var columnName = GetColumnName(memberExpr?.Member.Name);
-        _orderByClause += $", {columnName} DESC";
+        _limit = count;
+        return this;
+    }
+
+    public QueryBuilder<T> Skip(int count)
+    {
+        _offset = count;
         return this;
     }
 
@@ -52,10 +66,11 @@ public class QueryBuilder<T> where T : class
             sql += " WHERE " + string.Join(" AND ", _whereClauses);
         }
 
-        if (!string.IsNullOrEmpty(_orderByClause))
-        {
-            sql += " " + _orderByClause;
-        }
+        if (_orderClauses.Count > 0)
+            sql += " ORDER BY " + string.Join(", ", _orderClauses);
+
+        if (_limit.HasValue) sql += $" LIMIT {_limit}";
+        if (_offset.HasValue) sql += $" OFFSET {_offset}";
 
         return sql;
     }
@@ -74,7 +89,7 @@ public class QueryBuilder<T> where T : class
             BinaryExpression binExpr => TranslateBinaryExpression(binExpr),
             MethodCallExpression methodExpr => TranslateMethodCall(methodExpr),
             MemberExpression memberExpr => GetColumnName(memberExpr.Member.Name),
-            ConstantExpression constExpr => AddParameter(constExpr.Value),
+            ConstantExpression constExpr => AddParameter(constExpr.Value ?? DBNull.Value),
             _ => throw new OrmException($"Unsupported expression: {expr.GetType()}")
         };
     }
@@ -125,11 +140,19 @@ public class QueryBuilder<T> where T : class
         return paramName;
     }
 
-    public List<ParameterMapping> GetParameters() => _parameters;
+    private MemberExpression GetMemberExpression(Expression expr)
+    {
+        return expr switch
+        {
+            MemberExpression me => me,
+            UnaryExpression { Operand: MemberExpression ume } => ume,
+            _ => throw new OrmException("Invalid expression: expected a property.")
+        };
+    }
 }
 
 public class ParameterMapping
 {
-    public string Name { get; set; }
-    public object Value { get; set; }
+    public required string Name { get; init; }
+    public required object Value { get; init; }
 }

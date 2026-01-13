@@ -122,9 +122,9 @@ internal class DbConnectionNpgsql(string connectionString) : IDbConnection
         return command.ExecuteNonQuery();
     }
 
-    public object ExecuteScalar(DbCommand command)
+    public object? ExecuteScalar(DbCommand command)
     {
-        return command.ExecuteScalar() ?? throw new OrmException("Could not execute scalar query");
+        return command.ExecuteScalar();
     }
 
     public void BeginTransaction()
