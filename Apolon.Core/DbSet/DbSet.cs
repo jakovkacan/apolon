@@ -5,7 +5,8 @@ using System.Reflection;
 using Apolon.Core.Attributes;
 using Apolon.Core.DataAccess;
 using Apolon.Core.Mapping;
-using Apolon.Core.SqlBuilders;
+using Apolon.Core.Mapping.Models;
+using Apolon.Core.Sql;
 using Npgsql;
 
 namespace Apolon.Core.DbSet;

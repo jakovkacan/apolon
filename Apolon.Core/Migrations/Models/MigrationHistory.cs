@@ -1,6 +1,6 @@
 ﻿using Apolon.Core.Attributes;
 
-namespace Apolon.Core.Migrations;
+namespace Apolon.Core.Migrations.Models;
 
 [Table("__EFMigrationsHistory", Schema = "public")]
 public class MigrationHistory

@@ -6,13 +6,13 @@ namespace Apolon.Models;
 public class Patient : BaseEntity
 {
     [Column("first_name", DbType = "VARCHAR(100)", IsNullable = false)]
-    public string FirstName { get; set; }
+    public required string FirstName { get; set; }
 
     [Column("last_name", DbType = "VARCHAR(100)", IsNullable = false)]
-    public string LastName { get; set; }
+    public required string LastName { get; set; }
 
     [Column("email", DbType = "VARCHAR(255)", IsUnique = true, IsNullable = false)]
-    public string Email { get; set; }
+    public required string Email { get; set; }
 
     [Column("phone_number", DbType = "VARCHAR(20)", IsNullable = true)]
     public string? PhoneNumber { get; set; }

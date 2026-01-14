@@ -1,5 +1,6 @@
-﻿using Apolon.Core.SqlBuilders;
+﻿using Apolon.Core.Infrastructure;
 using Apolon.DataAccess;
+using Apolon.Models;
 
 const string connectionString =
     "Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=apolon;";
@@ -8,34 +9,36 @@ var context = new ApolonDbContext(connectionString, false);
 try
 {
     Console.WriteLine("Connecting to database...");
-    
+
     await context.Database.OpenConnectionAsync();
-    
+
     Console.WriteLine("Connected to database.");
-    
+
     Console.WriteLine("PATIENTS");
     var patients = context.Patients.ToList();
     patients.ForEach(Console.WriteLine);
-    
+
     Console.WriteLine("CHECKUPS");
     var checkups = context.Checkups.Include(c => c.CheckupType, c => c.Patient).ToList();
-    checkups.ForEach(checkup => {
-        Console.WriteLine($"{checkup} for {checkup.Patient}");
-    });
-    
+    checkups.ForEach(checkup => { Console.WriteLine($"{checkup} for {checkup.Patient}"); });
+
     Console.WriteLine("MEDICATIONS");
     var medications = context.Medications.ToList();
     medications.ForEach(Console.WriteLine);
-    
+
     Console.WriteLine("PRESCRIPTIONS");
     var prescriptions = context.Prescriptions.ToList();
     prescriptions.ForEach(Console.WriteLine);
-    
+
     Console.WriteLine("DONE");
-    
-    var query = context.Patients.Query().Where(p => p.PhoneNumber == "0123456789").ToList(context.Patients);
-    query.ForEach(Console.WriteLine);
-    
+
+    Console.WriteLine(DatabaseFacade.DumpModelSql([
+        typeof(Patient), typeof(Checkup), typeof(Medication), typeof(Prescription), typeof(CheckupType)
+    ]));
+
+    // var query = context.Patients.Query().Where(p => p.PhoneNumber == "0123456789").ToList(context.Patients);
+    // query.ForEach(Console.WriteLine);
+
     // context.Database.BeginTransaction();
     //
     // var patient = new Patient() {
@@ -101,9 +104,9 @@ try
     // context.Patients.SaveChanges();
     //
     // context.SaveChanges();
-    
+
     // context.SaveChanges();
-    
+
     // context.Patients.ToList().ForEach(Console.WriteLine);
 
     // var type = new CheckupType { TypeCode = "X-RAY", Description = "X-Ray" };

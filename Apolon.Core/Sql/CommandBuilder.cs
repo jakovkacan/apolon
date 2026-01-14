@@ -1,6 +1,7 @@
 ﻿using Apolon.Core.Mapping;
+using Apolon.Core.Mapping.Models;
 
-namespace Apolon.Core.SqlBuilders;
+namespace Apolon.Core.Sql;
 
 public class CommandBuilder<T> where T : class
 {

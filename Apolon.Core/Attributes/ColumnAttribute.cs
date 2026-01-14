@@ -9,5 +9,6 @@ public class ColumnAttribute(string name) : Attribute
     public required string DbType { get; set; }
     public bool IsNullable { get; set; } = true;
     public object? DefaultValue { get; set; }
+    public bool DefaultIsRawSql { get; set; } = false;
     public bool IsUnique { get; set; }
 }

@@ -1,8 +1,9 @@
 ﻿using System.Linq.Expressions;
 using Apolon.Core.Exceptions;
 using Apolon.Core.Mapping;
+using Apolon.Core.Mapping.Models;
 
-namespace Apolon.Core.SqlBuilders;
+namespace Apolon.Core.Sql;
 
 public class QueryBuilder<T> where T : class
 {

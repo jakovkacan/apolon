@@ -1,4 +1,6 @@
-﻿namespace Apolon.Core.Migrations;
+﻿using Apolon.Core.Migrations.Models;
+
+namespace Apolon.Core.Migrations;
 
 public class Migration001_InitialSchema : Migration
 {

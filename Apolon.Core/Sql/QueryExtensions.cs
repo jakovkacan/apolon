@@ -1,5 +1,6 @@
 ﻿using Apolon.Core.DbSet;
-namespace Apolon.Core.SqlBuilders;
+
+namespace Apolon.Core.Sql;
 
 public static class QueryExtensions
 {

@@ -1,6 +1,6 @@
 ﻿using Apolon.Core.Mapping;
 
-namespace Apolon.Core.SqlBuilders;
+namespace Apolon.Core.Sql;
 
 public static class MigrationBuilder
 {
@@ -30,7 +30,12 @@ public static class MigrationBuilder
             else
             {
                 if (!column.IsNullable) line += " NOT NULL";
-                if (column.DefaultValue != null) line += $" DEFAULT {FormatValue(column.DefaultValue)}";
+                if (column.DefaultValue != null) {
+                    var formatted = column.DefaultIsRawSql
+                        ? column.DefaultValue.ToString() 
+                        : FormatValue(column.DefaultValue);
+                    line += $" DEFAULT {formatted}";
+                }
                 if (column.IsUnique) line += " UNIQUE";
             }
 

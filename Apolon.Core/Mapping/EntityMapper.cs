@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using Apolon.Core.Attributes;
 using Apolon.Core.Exceptions;
+using Apolon.Core.Mapping.Models;
 
 namespace Apolon.Core.Mapping;
 
@@ -32,9 +33,10 @@ internal static class EntityMapper
         return metadata;
     }
 
-    private static List<Metadata> ExtractColumns(Type entityType)
+    private static List<PropertyMetadata> ExtractColumns(Type entityType)
     {
-        var columns = new List<Metadata>();
+        var columns = new List<PropertyMetadata>();
+        var nullabilityContext = new NullabilityInfoContext();
 
         foreach (var prop in entityType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
@@ -49,19 +51,19 @@ internal static class EntityMapper
             var columnAttr = prop.GetCustomAttribute<ColumnAttribute>();
             var columnName = columnAttr?.Name ?? MapperUtils.ConvertPascalToSnakeCase(prop.Name);
             var dbType = columnAttr?.DbType ?? TypeMapper.GetPostgresType(prop.PropertyType);
-            var isNullable = columnAttr?.IsNullable ?? 
-                             (!prop.PropertyType.IsValueType ||
-                              Nullable.GetUnderlyingType(prop.PropertyType) != null);
+            var isNullable = columnAttr?.IsNullable ?? IsPropertyNullable(nullabilityContext, prop);
             var defaultValue = columnAttr?.DefaultValue;
+            var defaultIsRawSql = columnAttr?.DefaultIsRawSql ?? false;
             var isUnique = columnAttr?.IsUnique ?? false;
 
-            columns.Add(new Metadata
+            columns.Add(new PropertyMetadata
             {
                 PropertyName = prop.Name,
                 ColumnName = columnName,
                 DbType = dbType,
                 IsNullable = isNullable,
                 DefaultValue = defaultValue,
+                DefaultIsRawSql = defaultIsRawSql,
                 IsUnique = isUnique,
                 Property = prop
             });
@@ -151,5 +153,22 @@ internal static class EntityMapper
         }
 
         return relationships;
+    }
+    
+    private static bool IsPropertyNullable(NullabilityInfoContext context, PropertyInfo prop)
+    {
+        // value types
+        if (Nullable.GetUnderlyingType(prop.PropertyType) != null)
+            return true;
+
+        // reference types
+        if (!prop.PropertyType.IsValueType)
+        {
+            var nullabilityInfo = context.Create(prop);
+            return nullabilityInfo.WriteState == NullabilityState.Nullable;
+        }
+
+        // non-nullable
+        return false;
     }
 }

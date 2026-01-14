@@ -1,4 +1,6 @@
-﻿using Apolon.Core.DataAccess;
+﻿using System.Text;
+using Apolon.Core.DataAccess;
+using Apolon.Core.Sql;
 
 namespace Apolon.Core.Infrastructure;
 
@@ -59,4 +61,15 @@ public class DatabaseFacade
     public void CommitTransaction() => _connection.CommitTransaction();
     public void RollbackTransaction() => _connection.RollbackTransaction();
 
+    public static string DumpModelSql(List<Type> modelTypes)
+    {
+        StringBuilder sb = new();
+        
+        foreach (var modelType in modelTypes)
+        {
+            sb.AppendLine(MigrationBuilder.BuildCreateTable(modelType));
+        }
+        
+        return sb.ToString();
+    }
 }

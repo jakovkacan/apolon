@@ -1,6 +1,7 @@
 ﻿using System.Data.Common;
 using Apolon.Core.Mapping;
-using Apolon.Core.SqlBuilders;
+using Apolon.Core.Mapping.Models;
+using Apolon.Core.Sql;
 
 namespace Apolon.Core.DataAccess;
 

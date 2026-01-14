@@ -1,25 +1,26 @@
 ﻿using System.Reflection;
 
-namespace Apolon.Core.Mapping;
+namespace Apolon.Core.Mapping.Models;
 
 internal class EntityMetadata
 {
     public required Type EntityType { get; init; }
     public required string TableName { get; init; }
     public required string Schema { get; init; }
-    public required List<Metadata> Columns { get; init; }
+    public required IList<PropertyMetadata> Columns { get; init; }
     public required PrimaryKeyMetadata PrimaryKey { get; init; }
     public required IReadOnlyList<ForeignKeyMetadata> ForeignKeys { get; init; }
     public required IReadOnlyList<RelationshipMetadata> Relationships { get; set; }
 }
 
-internal class Metadata
+internal class PropertyMetadata
 {
     public required string PropertyName { get; init; }
     public required string ColumnName { get; init; }
     public required string DbType { get; init; }
     public required bool IsNullable { get; init; }
     public object? DefaultValue { get; init; }
+    public bool DefaultIsRawSql { get; init; }
     public required bool IsUnique { get; init; }
     public required PropertyInfo Property { get; init; }
 }

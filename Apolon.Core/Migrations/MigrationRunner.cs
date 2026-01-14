@@ -1,5 +1,6 @@
 ﻿using Apolon.Core.DataAccess;
-using Apolon.Core.SqlBuilders;
+using Apolon.Core.Migrations.Models;
+using Apolon.Core.Sql;
 
 namespace Apolon.Core.Migrations;
 
