@@ -10,6 +10,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Apolon.Console", "Apolon.Co
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Apolon.DataAccess", "Apolon.DataAccess\Apolon.DataAccess.csproj", "{0DE78B55-1C7A-4F2F-AD11-D25A759D2483}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Apolon.Core.Tests", "Apolon.Core.Tests\Apolon.Core.Tests.csproj", "{A252D907-9878-4CC7-9A35-C59264D03E0A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,5 +38,9 @@ Global
 		{0DE78B55-1C7A-4F2F-AD11-D25A759D2483}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0DE78B55-1C7A-4F2F-AD11-D25A759D2483}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0DE78B55-1C7A-4F2F-AD11-D25A759D2483}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A252D907-9878-4CC7-9A35-C59264D03E0A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A252D907-9878-4CC7-9A35-C59264D03E0A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A252D907-9878-4CC7-9A35-C59264D03E0A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A252D907-9878-4CC7-9A35-C59264D03E0A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

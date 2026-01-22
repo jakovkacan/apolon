@@ -3,9 +3,14 @@
 namespace Apolon.Core.Attributes;
 
 [AttributeUsage(AttributeTargets.Property)]
-public class ForeignKeyAttribute(Type type, string referencedColumn) : Attribute
+public class ForeignKeyAttribute(Type type) : Attribute
 {
     public Type ReferencedTable { get; set; } = type;
-    public string ReferencedColumn { get; set; } = referencedColumn;
-    public string OnDeleteBehavior { get; set; } = "CASCADE";
+    public string? ReferencedColumn { get; set; }
+    public OnDeleteBehavior OnDeleteBehavior { get; set; } = OnDeleteBehavior.NoAction;
+    
+    public ForeignKeyAttribute(Type type, string referencedColumn) : this(type)
+    {
+        ReferencedColumn = referencedColumn;
+    }
 }

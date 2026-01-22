@@ -1,5 +1,7 @@
 ﻿using System.Text;
 using Apolon.Core.DataAccess;
+using Apolon.Core.Migrations;
+using Apolon.Core.Migrations.Models;
 using Apolon.Core.Sql;
 
 namespace Apolon.Core.Infrastructure;
@@ -60,16 +62,30 @@ public class DatabaseFacade
     public void BeginTransaction() => _connection.BeginTransaction();
     public void CommitTransaction() => _connection.CommitTransaction();
     public void RollbackTransaction() => _connection.RollbackTransaction();
-
-    public static string DumpModelSql(List<Type> modelTypes)
+    
+    public static string DumpModelSql(Type[] modelTypes)
     {
         StringBuilder sb = new();
-        
+
         foreach (var modelType in modelTypes)
         {
-            sb.AppendLine(MigrationBuilder.BuildCreateTable(modelType));
+            sb.Append(MigrationBuilder.BuildCreateTable(modelType));
         }
         
         return sb.ToString();
+    }
+
+    public static SchemaSnapshot DumpModelSchema(Type[] modelTypes)
+    {
+        var modelSnapshot = ModelSnapshotBuilder.BuildFromModel(modelTypes);
+        
+        return modelSnapshot;
+    }
+
+    public async Task<SchemaSnapshot> DumpDbSchema()
+    {
+        var schemaSnapshot = await SnapshotReader.ReadAsync(_connection);
+
+        return schemaSnapshot;
     }
 }

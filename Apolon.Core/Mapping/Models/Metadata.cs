@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using Apolon.Core.Attributes;
 
 namespace Apolon.Core.Mapping.Models;
 
@@ -39,7 +40,7 @@ internal class ForeignKeyMetadata
     public required string ColumnName { get; init; }
     public required Type ReferencedTable { get; init; }
     public required string ReferencedColumn { get; init; }
-    public required string OnDeleteBehavior { get; init; }
+    public required OnDeleteBehavior OnDeleteBehavior { get; init; }
     public required PropertyInfo Property { get; init; }
 }
 

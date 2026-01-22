@@ -6,11 +6,11 @@ namespace Apolon.Models;
 public class Prescription : BaseEntity
 {
     [Column("checkup_id", DbType = "INT", IsNullable = false)]
-    [ForeignKey(typeof(Checkup), "id", OnDeleteBehavior = "CASCADE")]
+    [ForeignKey(typeof(Checkup), OnDeleteBehavior = OnDeleteBehavior.Cascade)]
     public int CheckupId { get; set; }
 
     [Column("medication_id", DbType = "INT", IsNullable = false)]
-    [ForeignKey(typeof(Medication), "id")]
+    [ForeignKey(typeof(Medication))]
     public required int MedicationId { get; set; }
 
     public required decimal Dosage { get; set; }

@@ -17,7 +17,7 @@ public class Patient : BaseEntity
     [Column("phone_number", DbType = "VARCHAR(20)", IsNullable = true)]
     public string? PhoneNumber { get; set; }
 
-    [Column("date_of_birth", DbType = "DATETIME", IsNullable = true)]
+    [Column("date_of_birth", DbType = "TIMESTAMP", IsNullable = true)]
     public DateTime? DateOfBirth { get; set; }
 
     [Column("gender", DbType = "VARCHAR(10)", IsNullable = true)]

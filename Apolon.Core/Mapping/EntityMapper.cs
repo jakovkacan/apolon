@@ -49,9 +49,17 @@ internal static class EntityMapper
                 continue;
 
             var columnAttr = prop.GetCustomAttribute<ColumnAttribute>();
+            var isRequiredAttrPresent = prop.GetCustomAttribute<RequiredAttribute>() != null;
+
             var columnName = columnAttr?.Name ?? MapperUtils.ConvertPascalToSnakeCase(prop.Name);
             var dbType = columnAttr?.DbType ?? TypeMapper.GetPostgresType(prop.PropertyType);
-            var isNullable = columnAttr?.IsNullable ?? IsPropertyNullable(nullabilityContext, prop);
+
+            // 1) [Required] => NOT NULL
+            // 2) if IsNullable is provided => isNullable
+            // 3) infer from nullable reference types
+            var inferredNullable = IsPropertyNullable(nullabilityContext, prop);
+            var isNullable = !isRequiredAttrPresent && (columnAttr?.IsNullable ?? inferredNullable);
+            
             var defaultValue = columnAttr?.DefaultValue;
             var defaultIsRawSql = columnAttr?.DefaultIsRawSql ?? false;
             var isUnique = columnAttr?.IsUnique ?? false;
@@ -100,12 +108,15 @@ internal static class EntityMapper
             if (fkAttr == null) continue;
 
             var columnAttr = prop.GetCustomAttribute<ColumnAttribute>();
+
+            var referencedColumn = fkAttr.ReferencedColumn ?? GetMetadata(fkAttr.ReferencedTable).PrimaryKey.ColumnName;
+
             fks.Add(new ForeignKeyMetadata
             {
                 PropertyName = prop.Name,
                 ColumnName = columnAttr?.Name ?? prop.Name,
                 ReferencedTable = fkAttr.ReferencedTable,
-                ReferencedColumn = fkAttr.ReferencedColumn,
+                ReferencedColumn = referencedColumn,
                 OnDeleteBehavior = fkAttr.OnDeleteBehavior,
                 Property = prop
             });
@@ -154,7 +165,7 @@ internal static class EntityMapper
 
         return relationships;
     }
-    
+
     private static bool IsPropertyNullable(NullabilityInfoContext context, PropertyInfo prop)
     {
         // value types

@@ -5,11 +5,13 @@ namespace Apolon.Models;
 [Table("checkup")]
 public class Checkup : BaseEntity
 {
-    [Column("patient_id", DbType = "INT", IsNullable = false)]
-    [ForeignKey(typeof(Patient), "id", OnDeleteBehavior = "CASCADE")]
+    [Required]
+    [Column("patient_id", DbType = "INT")]
+    [ForeignKey(typeof(Patient), "id", OnDeleteBehavior = OnDeleteBehavior.Cascade)]
     public int PatientId { get; set; }
 
-    [Column("checkup_type_id", DbType = "INT", IsNullable = false)]
+    [Required]
+    [Column("checkup_type_id", DbType = "INT")]
     [ForeignKey(typeof(CheckupType), "id")]
     public int CheckupTypeId { get; set; }
 

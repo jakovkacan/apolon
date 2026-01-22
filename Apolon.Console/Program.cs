@@ -1,4 +1,5 @@
-﻿using Apolon.Core.Infrastructure;
+﻿using System.Diagnostics;
+using Apolon.Core.Infrastructure;
 using Apolon.DataAccess;
 using Apolon.Models;
 
@@ -31,10 +32,32 @@ try
     prescriptions.ForEach(Console.WriteLine);
 
     Console.WriteLine("DONE");
+    
+    // Console.WriteLine(DatabaseFacade.DumpModelSql([
+    //     typeof(Checkup), typeof(CheckupType), typeof(Medication), typeof(Patient), typeof(Prescription), 
+    // ]));
 
-    Console.WriteLine(DatabaseFacade.DumpModelSql([
-        typeof(Patient), typeof(Checkup), typeof(Medication), typeof(Prescription), typeof(CheckupType)
-    ]));
+    var modelSnapshot = DatabaseFacade.DumpModelSchema([
+        typeof(Checkup), typeof(CheckupType), typeof(Medication), typeof(Patient), typeof(Prescription)
+    ]);
+    
+    Console.WriteLine("MODEL SCHEMA");
+    // Console.WriteLine(modelSnapshot);
+
+    var snapshot = await context.Database.DumpDbSchema();
+    
+    Console.WriteLine("DB SCHEMA");
+    // Console.WriteLine(snapshot);
+    
+    Console.WriteLine("ASSERT EQUAL");
+    Console.WriteLine(snapshot.Equals(modelSnapshot));
+    
+    if (!snapshot.Equals(modelSnapshot))
+    {
+        var diffs = snapshot.Diff(modelSnapshot);
+        Console.WriteLine(string.Join(Environment.NewLine, diffs));
+    }
+
 
     // var query = context.Patients.Query().Where(p => p.PhoneNumber == "0123456789").ToList(context.Patients);
     // query.ForEach(Console.WriteLine);
