@@ -18,7 +18,10 @@ public class Checkup : BaseEntity
     public DateTime CheckupDate { get; set; }
     public string? Notes { get; set; }
     public string? Results { get; set; }
-
+    
+    // [NotMapped]
+    // public required string Test { get; set; }
+    
     // Navigation properties
     public Patient? Patient { get; set; }
     public CheckupType? CheckupType { get; set; }

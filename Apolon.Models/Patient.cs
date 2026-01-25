@@ -5,25 +5,32 @@ namespace Apolon.Models;
 [Table("patient")]
 public class Patient : BaseEntity
 {
-    [Column("first_name", DbType = "VARCHAR(100)", IsNullable = false)]
+    [Required]
+    [Column("first_name", DbType = "VARCHAR(100)")]
     public required string FirstName { get; set; }
 
-    [Column("last_name", DbType = "VARCHAR(100)", IsNullable = false)]
+    [Required]
+    [Column("last_name", DbType = "VARCHAR(100)")]
     public required string LastName { get; set; }
 
-    [Column("email", DbType = "VARCHAR(255)", IsUnique = true, IsNullable = false)]
+    [Required]
+    [Column("email", DbType = "VARCHAR(255)", IsUnique = true)]
     public required string Email { get; set; }
 
-    [Column("phone_number", DbType = "VARCHAR(20)", IsNullable = true)]
+    [Optional]
+    [Column("phone_number", DbType = "VARCHAR(20)")]
     public string? PhoneNumber { get; set; }
 
-    [Column("date_of_birth", DbType = "TIMESTAMP", IsNullable = true)]
+    [Optional]
+    [Column("date_of_birth", DbType = "TIMESTAMP")]
     public DateTime? DateOfBirth { get; set; }
 
-    [Column("gender", DbType = "VARCHAR(10)", IsNullable = true)]
+    [Optional]
+    [Column("gender", DbType = "VARCHAR(10)")]
     public string? Gender { get; set; }
 
-    [Column("address", DbType = "VARCHAR(255)", IsNullable = true)]
+    [Optional]
+    [Column("address", DbType = "VARCHAR(255)")]
     public string? Address { get; set; }
 
     // Navigation properties

@@ -1,5 +1,5 @@
-﻿using System.Diagnostics;
-using Apolon.Core.Infrastructure;
+﻿using Apolon.Core.Context;
+using Apolon.Core.Migrations;
 using Apolon.DataAccess;
 using Apolon.Models;
 
@@ -15,49 +15,60 @@ try
 
     Console.WriteLine("Connected to database.");
 
-    Console.WriteLine("PATIENTS");
-    var patients = context.Patients.ToList();
-    patients.ForEach(Console.WriteLine);
+    // Console.WriteLine("PATIENTS");
+    // var patients = context.Patients.ToList();
+    // patients.ForEach(Console.WriteLine);
+    //
+    // Console.WriteLine("CHECKUPS");
+    // var checkups = context.Checkups.Include(c => c.CheckupType, c => c.Patient).ToList();
+    // checkups.ForEach(checkup => { Console.WriteLine($"{checkup} for {checkup.Patient}"); });
+    //
+    // Console.WriteLine("MEDICATIONS");
+    // var medications = context.Medications.ToList();
+    // medications.ForEach(Console.WriteLine);
+    //
+    // Console.WriteLine("PRESCRIPTIONS");
+    // var prescriptions = context.Prescriptions.ToList();
+    // prescriptions.ForEach(Console.WriteLine);
+    //
+    // Console.WriteLine("DONE");
 
-    Console.WriteLine("CHECKUPS");
-    var checkups = context.Checkups.Include(c => c.CheckupType, c => c.Patient).ToList();
-    checkups.ForEach(checkup => { Console.WriteLine($"{checkup} for {checkup.Patient}"); });
-
-    Console.WriteLine("MEDICATIONS");
-    var medications = context.Medications.ToList();
-    medications.ForEach(Console.WriteLine);
-
-    Console.WriteLine("PRESCRIPTIONS");
-    var prescriptions = context.Prescriptions.ToList();
-    prescriptions.ForEach(Console.WriteLine);
-
-    Console.WriteLine("DONE");
-    
     // Console.WriteLine(DatabaseFacade.DumpModelSql([
     //     typeof(Checkup), typeof(CheckupType), typeof(Medication), typeof(Patient), typeof(Prescription), 
     // ]));
 
-    var modelSnapshot = DatabaseFacade.DumpModelSchema([
-        typeof(Checkup), typeof(CheckupType), typeof(Medication), typeof(Patient), typeof(Prescription)
-    ]);
-    
-    Console.WriteLine("MODEL SCHEMA");
+    List<Type> entityTypes =
+    [
+        typeof(Test),
+        typeof(Checkup), typeof(CheckupType), typeof(Medication), typeof(Patient), typeof(Prescription), 
+    ];
+
+    var modelSnapshot = DatabaseFacade.DumpModelSchema(entityTypes.ToArray());
+
+    // Console.WriteLine("MODEL SCHEMA");
     // Console.WriteLine(modelSnapshot);
 
     var snapshot = await context.Database.DumpDbSchema();
-    
-    Console.WriteLine("DB SCHEMA");
+
+    // Console.WriteLine("DB SCHEMA");
     // Console.WriteLine(snapshot);
-    
+
     Console.WriteLine("ASSERT EQUAL");
     Console.WriteLine(snapshot.Equals(modelSnapshot));
-    
+
     if (!snapshot.Equals(modelSnapshot))
     {
-        var diffs = snapshot.Diff(modelSnapshot);
-        Console.WriteLine(string.Join(Environment.NewLine, diffs));
+        var diffs = DatabaseFacade.DiffSchema(modelSnapshot, snapshot);
+        var diffsList = diffs.ToList();
+        diffsList.ForEach(Console.WriteLine);
+        
+        Console.WriteLine("SYNC SCHEMA");
+        var sql = await context.Database.SyncSchemaAsync(entityTypes.ToArray());
+        
+        Console.WriteLine("ASSERT EQUAL AFTER SYNC");
+        var newSnapshot = await context.Database.DumpDbSchema();
+        Console.WriteLine(newSnapshot.Equals(modelSnapshot));
     }
-
 
     // var query = context.Patients.Query().Where(p => p.PhoneNumber == "0123456789").ToList(context.Patients);
     // query.ForEach(Console.WriteLine);

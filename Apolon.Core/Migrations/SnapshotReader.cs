@@ -1,5 +1,4 @@
-﻿using System.Data.Common;
-using Apolon.Core.Attributes;
+﻿using Apolon.Core.Attributes;
 using Apolon.Core.DataAccess;
 using Apolon.Core.Migrations.Models;
 

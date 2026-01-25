@@ -4,15 +4,17 @@ using Apolon.Core.Migrations;
 using Apolon.Core.Migrations.Models;
 using Apolon.Core.Sql;
 
-namespace Apolon.Core.Infrastructure;
+namespace Apolon.Core.Context;
 
 public class DatabaseFacade
 {
     private readonly IDbConnection _connection;
+    private readonly MigrationRunner _migrationRunner;
     
     internal DatabaseFacade(IDbConnection connection)
     {
         _connection = connection;
+        _migrationRunner = new MigrationRunner(connection);
     }
     
     // Connection
@@ -87,5 +89,16 @@ public class DatabaseFacade
         var schemaSnapshot = await SnapshotReader.ReadAsync(_connection);
 
         return schemaSnapshot;
+    }
+    
+    public static IReadOnlyList<MigrationOperation> DiffSchema(SchemaSnapshot expected, SchemaSnapshot actual)
+    {
+        var ops = SchemaDiffer.Diff(expected, actual);
+        return ops;
+    }
+    
+    public Task<IReadOnlyList<string>> SyncSchemaAsync(params Type[] entityTypes)
+    {
+        return _migrationRunner.SyncSchemaAsync(entityTypes: entityTypes);
     }
 }

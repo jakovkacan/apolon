@@ -40,6 +40,9 @@ internal static class EntityMapper
 
         foreach (var prop in entityType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
+            if (prop.GetCustomAttribute<NotMappedAttribute>() != null)
+                continue;
+
             // skip navigation properties 
             if (prop.PropertyType.IsGenericType &&
                 prop.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>))
@@ -50,15 +53,16 @@ internal static class EntityMapper
 
             var columnAttr = prop.GetCustomAttribute<ColumnAttribute>();
             var isRequiredAttrPresent = prop.GetCustomAttribute<RequiredAttribute>() != null;
+            var isOptionalAttrPresent = prop.GetCustomAttribute<OptionalAttribute>() != null;
 
             var columnName = columnAttr?.Name ?? MapperUtils.ConvertPascalToSnakeCase(prop.Name);
             var dbType = columnAttr?.DbType ?? TypeMapper.GetPostgresType(prop.PropertyType);
 
             // 1) [Required] => NOT NULL
-            // 2) if IsNullable is provided => isNullable
+            // 2) [Optional] => NULL
             // 3) infer from nullable reference types
-            var inferredNullable = IsPropertyNullable(nullabilityContext, prop);
-            var isNullable = !isRequiredAttrPresent && (columnAttr?.IsNullable ?? inferredNullable);
+            var inferredNullable = IsPropertyNullable(nullabilityContext, prop);            
+            var isNullable = !isRequiredAttrPresent && (isOptionalAttrPresent || inferredNullable);
             
             var defaultValue = columnAttr?.DefaultValue;
             var defaultIsRawSql = columnAttr?.DefaultIsRawSql ?? false;
@@ -92,7 +96,7 @@ internal static class EntityMapper
         return new PrimaryKeyMetadata
         {
             PropertyName = prop.Name,
-            ColumnName = columnAttr?.Name ?? prop.Name,
+            ColumnName = columnAttr?.Name ?? MapperUtils.ConvertPascalToSnakeCase(prop.Name),
             AutoIncrement = prop.GetCustomAttribute<PrimaryKeyAttribute>()?.AutoIncrement ?? true,
             Property = prop
         };
@@ -114,7 +118,7 @@ internal static class EntityMapper
             fks.Add(new ForeignKeyMetadata
             {
                 PropertyName = prop.Name,
-                ColumnName = columnAttr?.Name ?? prop.Name,
+                ColumnName = columnAttr?.Name ?? MapperUtils.ConvertPascalToSnakeCase(prop.Name),
                 ReferencedTable = fkAttr.ReferencedTable,
                 ReferencedColumn = referencedColumn,
                 OnDeleteBehavior = fkAttr.OnDeleteBehavior,

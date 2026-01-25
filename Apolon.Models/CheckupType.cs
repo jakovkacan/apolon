@@ -5,7 +5,8 @@ namespace Apolon.Models;
 [Table("checkup_type")]
 public class CheckupType
 {
-    [Column("id", DbType = "INT", IsNullable = false)]
+    [Required]
+    [Column("id", DbType = "INT")]
     [PrimaryKey(AutoIncrement = true)]
     public int Id { get; set; }
 

@@ -51,7 +51,7 @@ public static class MigrationBuilder
         foreach (var fk in metadata.ForeignKeys)
         {
             var refMetadata = EntityMapper.GetMetadata(fk.ReferencedTable);
-            var line = $"    CONSTRAINT fk_{metadata.TableName}_{fk.ColumnName} " +
+            var line = $"    CONSTRAINT {metadata.TableName}_{fk.ColumnName}_fkey " +
                        $"FOREIGN KEY ({fk.ColumnName}) " +
                        $"REFERENCES {refMetadata.Schema}.{refMetadata.TableName}({fk.ReferencedColumn}) " +
                        $"ON DELETE {fk.OnDeleteBehavior.ToSql()}";
@@ -85,13 +85,32 @@ public static class MigrationBuilder
     public static string BuildCreateTableFromName(string schema, string table)
         => $"CREATE TABLE {schema}.{table} ();";
 
-    public static string BuildAddColumn(string schema, string table, string column, string sqlType, bool isNullable,
-        string? defaultSql)
+    public static string BuildDropTableFromName(string schema, string table, bool cascade = true)
+    {
+        var cascadeSql = cascade ? " CASCADE" : "";
+        return $"DROP TABLE IF EXISTS {schema}.{table}{cascadeSql};";
+    }
+
+    public static string BuildAddColumn(
+        string schema,
+        string table,
+        string column,
+        string sqlType,
+        bool isNullable,
+        string? defaultSql,
+        bool isPrimaryKey = false,
+        bool isIdentity = false,
+        string? identityGeneration = null)
     {
         var nullSql = isNullable ? "" : " NOT NULL";
         var defaultClause = string.IsNullOrWhiteSpace(defaultSql) ? "" : $" DEFAULT {defaultSql}";
-        return $"ALTER TABLE {schema}.{table} ADD COLUMN {column} {sqlType}{defaultClause}{nullSql};";
+        var pkClause = isPrimaryKey ? " PRIMARY KEY" : "";
+        var identityClause = isIdentity ? $" GENERATED {NormalizeIdentity(identityGeneration)} AS IDENTITY" : "";
+        return $"ALTER TABLE {schema}.{table} ADD COLUMN {column} {sqlType}{defaultClause}{nullSql}{pkClause}{identityClause};";
     }
+
+    public static string BuildDropColumn(string schema, string table, string column)
+        => $"ALTER TABLE {schema}.{table} DROP COLUMN IF EXISTS {column};";
 
     public static string BuildAlterColumnType(string schema, string table, string column, string sqlType)
         => $"ALTER TABLE {schema}.{table} ALTER COLUMN {column} TYPE {sqlType};";
@@ -108,7 +127,7 @@ public static class MigrationBuilder
         => $"ALTER TABLE {schema}.{table} ALTER COLUMN {column} DROP DEFAULT;";
 
     public static string BuildAddUnique(string schema, string table, string column)
-        => $"ALTER TABLE {schema}.{table} ADD CONSTRAINT uq_{table}_{column} UNIQUE ({column});";
+        => $"ALTER TABLE {schema}.{table} ADD CONSTRAINT {table}_{column}_key UNIQUE ({column});";
 
     public static string BuildDropConstraint(string schema, string table, string constraintName)
         => $"ALTER TABLE {schema}.{table} DROP CONSTRAINT IF EXISTS {constraintName};";
@@ -135,5 +154,16 @@ public static class MigrationBuilder
             DateTime dt => $"'{dt:yyyy-MM-dd HH:mm:ss}'",
             _ => value.ToString()
         } ?? throw new InvalidOperationException();
+    }
+
+    private static string NormalizeIdentity(string? identityGeneration)
+    {
+        return identityGeneration?.ToUpperInvariant() switch
+        {
+            "ALWAYS" => "ALWAYS",
+            "BY DEFAULT" => "BY DEFAULT",
+            "BYDEFAULT" => "BY DEFAULT",
+            _ => "ALWAYS"
+        };
     }
 }

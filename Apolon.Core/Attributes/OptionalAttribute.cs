@@ -1,6 +1,6 @@
 ﻿namespace Apolon.Core.Attributes;
 
 [AttributeUsage(AttributeTargets.Property)]
-public sealed class RequiredAttribute : Attribute
+public sealed class OptionalAttribute : Attribute
 {
 }

@@ -2,4 +2,13 @@
 
 namespace Apolon.Core.Exceptions;
 
-public class OrmException(string message) : Exception(message);
+public class OrmException : Exception
+{
+    public OrmException(string message) : base(message)
+    {
+    }
+
+    public OrmException(string message, Exception innerException) : base(message, innerException)
+    {
+    }
+}
