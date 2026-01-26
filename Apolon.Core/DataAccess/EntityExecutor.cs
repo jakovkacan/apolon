@@ -19,6 +19,18 @@ internal class EntityExecutor(IDbConnection connection)
 
         return connection.ExecuteNonQuery(command);
     }
+    
+    public Task<int> InsertAsync<T>(T entity) where T : class
+    {
+        var builder = new CommandBuilder<T>();
+        var (sql, values) = builder.BuildInsert(entity);
+        var command = connection.CreateCommand(sql);
+
+        for (var i = 0; i < values.Count; i++)
+            connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
+
+        return connection.ExecuteNonQueryAsync(command);
+    }
 
     public int Update<T>(T entity) where T : class
     {
@@ -33,6 +45,20 @@ internal class EntityExecutor(IDbConnection connection)
 
         return connection.ExecuteNonQuery(command);
     }
+    
+    public Task<int> UpdateAsync<T>(T entity) where T : class
+    {
+        var builder = new CommandBuilder<T>();
+        var (sql, values, pkValue) = builder.BuildUpdate(entity);
+        var command = connection.CreateCommand(sql);
+
+        for (var i = 0; i < values.Count; i++)
+            connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
+
+        connection.AddParameter(command, "@pk", pkValue);
+
+        return connection.ExecuteNonQueryAsync(command);
+    }
 
     public int Delete<T>(T entity) where T : class
     {
@@ -43,6 +69,17 @@ internal class EntityExecutor(IDbConnection connection)
         connection.AddParameter(command, "@pk", pkValue);
 
         return connection.ExecuteNonQuery(command);
+    }
+    
+    public Task<int> DeleteAsync<T>(T entity) where T : class
+    {
+        var builder = new CommandBuilder<T>();
+        var (sql, pkValue) = builder.BuildDelete(entity);
+
+        var command = connection.CreateCommand(sql);
+        connection.AddParameter(command, "@pk", pkValue);
+
+        return connection.ExecuteNonQueryAsync(command);
     }
 
     public List<T> Query<T>(QueryBuilder<T> qb) where T : class
@@ -61,6 +98,36 @@ internal class EntityExecutor(IDbConnection connection)
             var metadata = EntityMapper.GetMetadata(typeof(T));
 
             while (reader.Read())
+            {
+                result.Add(MapEntity<T>(reader, metadata));
+            }
+        }
+        catch (DbException ex)
+        {
+            throw new DataAccessException(
+                $"Query failed for entity '{typeof(T).Name}'. Check that the database schema is in sync with the model. SQL: {sql}",
+                ex);
+        }
+
+        return result;
+    }
+    
+    public async Task<List<T>> QueryAsync<T>(QueryBuilder<T> qb) where T : class
+    {
+        var sql = qb.Build();
+        var command = connection.CreateCommand(sql);
+        foreach (var param in qb.GetParameters())
+        {
+            connection.AddParameter(command, param.Name, param.Value);
+        }
+
+        var result = new List<T>();
+        try
+        {
+            await using var reader = await connection.ExecuteReaderAsync(command);
+            var metadata = EntityMapper.GetMetadata(typeof(T));
+
+            while (await reader.ReadAsync())
             {
                 result.Add(MapEntity<T>(reader, metadata));
             }

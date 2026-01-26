@@ -26,6 +26,10 @@ public class Test
     [Column("created_at", DbType = "TIMESTAMP", DefaultValue = "CURRENT_TIMESTAMP", DefaultIsRawSql = true)]
     public required DateTime CreatedAt { get; set; }
     
+    public required float PreciseResult { get; set; }
+    
+    public decimal? ApproximateResult { get; set; }
+    
     [NotMapped]
     public string? InternalNotes { get; set; }
 }

@@ -1,17 +1,17 @@
-﻿using Apolon.Core.DataAccess;
+using Apolon.Core.Migrations;
 
 namespace Apolon.Core.Migrations.Models;
 
 public abstract class Migration
 {
-    internal IDbConnection Connection { get; set; }
+    public abstract void Up(MigrationBuilder migrationBuilder);
+    public abstract void Down(MigrationBuilder migrationBuilder);
 
-    public abstract void Up();
-    public abstract void Down();
 
-    protected void ExecuteSql(string sql)
+    protected static IReadOnlyList<MigrationOperation> DiffSchema(
+        SchemaSnapshot expected,
+        SchemaSnapshot actual)
     {
-        var command = Connection.CreateCommand(sql);
-        Connection.ExecuteNonQuery(command);
+        return SchemaDiffer.Diff(expected, actual);
     }
 }

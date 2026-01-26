@@ -20,8 +20,8 @@ internal static class SnapshotNormalization
             "timestamp with time zone" => "timestamptz",
             "time without time zone" => "time",
             "time with time zone" => "timetz",
-            "double precision" => "float8",
-            "real" => "float4",
+            "double precision" => "double",
+            "real" or "float" => "float4",
             "integer" or "int" => "int4",
             "decimal" => "numeric",
             _ => t
@@ -44,7 +44,7 @@ internal static class SnapshotNormalization
                 "int" or "int4" => (null, 32, 0),
                 "decimal" => (null, 18, 2),
                 "double precision" => (null, 53, null),
-                "real" => (null, 24, null),
+                "real" or "float" => (null, 24, null),
                 "varchar" => (255, null, null),
                 _ => (null, null, null)
             };

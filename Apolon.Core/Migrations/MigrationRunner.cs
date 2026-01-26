@@ -23,11 +23,17 @@ public class MigrationRunner
     {
         foreach (var migrationType in migrationTypes)
         {
-            if (!IsMigrationApplied(migrationType.Name))
+            // if (!IsMigrationApplied(migrationType.Name))
             {
                 var migration = (Migration)Activator.CreateInstance(migrationType);
-                migration.Up();
-                RecordMigration(migrationType.Name);
+                var builder = new MigrationBuilder();
+                migration.Up(builder);
+
+                // Convert operations to SQL and execute
+                var sqlBatch = ConvertOperationsToSql(builder.Operations);
+                ExecuteSqlAsync(sqlBatch).Wait();
+
+                // RecordMigration(migrationType.Name);
             }
         }
     }
@@ -42,7 +48,7 @@ public class MigrationRunner
             if (migrationType != null)
             {
                 var migration = (Migration)Activator.CreateInstance(migrationType);
-                migration.Down();
+                // migration.Down();
                 RemoveMigration(migrationName);
             }
         }
@@ -64,14 +70,14 @@ public class MigrationRunner
 
         // Create schema/table ops first
         foreach (var op in ops.Where(o => o.Type is MigrationOperationType.CreateSchema))
-            sqlBatch.Add(MigrationBuilder.BuildCreateSchema(op.Schema));
+            sqlBatch.Add(MigrationBuilderSql.BuildCreateSchema(op.Schema));
 
         foreach (var op in ops.Where(o => o.Type is MigrationOperationType.CreateTable))
-            sqlBatch.Add(MigrationBuilder.BuildCreateTableFromName(op.Schema, op.Table));
+            sqlBatch.Add(MigrationBuilderSql.BuildCreateTableFromName(op.Schema, op.Table));
 
         // Column changes
         foreach (var op in ops.Where(o => o.Type is MigrationOperationType.AddColumn))
-            sqlBatch.Add(MigrationBuilder.BuildAddColumn(
+            sqlBatch.Add(MigrationBuilderSql.BuildAddColumn(
                 op.Schema,
                 op.Table,
                 op.Column!,
@@ -83,35 +89,35 @@ public class MigrationRunner
                 op.IdentityGeneration));
 
         foreach (var op in ops.Where(o => o.Type is MigrationOperationType.AlterColumnType))
-            sqlBatch.Add(MigrationBuilder.BuildAlterColumnType(op.Schema, op.Table, op.Column!, op.GetSqlType()!));
+            sqlBatch.Add(MigrationBuilderSql.BuildAlterColumnType(op.Schema, op.Table, op.Column!, op.GetSqlType()!));
 
         foreach (var op in ops.Where(o => o.Type is MigrationOperationType.AlterNullability))
-            sqlBatch.Add(MigrationBuilder.BuildAlterNullability(op.Schema, op.Table, op.Column!, op.IsNullable!.Value));
+            sqlBatch.Add(MigrationBuilderSql.BuildAlterNullability(op.Schema, op.Table, op.Column!, op.IsNullable!.Value));
 
         foreach (var op in ops.Where(o => o.Type is MigrationOperationType.SetDefault))
-            sqlBatch.Add(MigrationBuilder.BuildSetDefault(op.Schema, op.Table, op.Column!, op.DefaultSql!));
+            sqlBatch.Add(MigrationBuilderSql.BuildSetDefault(op.Schema, op.Table, op.Column!, op.DefaultSql!));
 
         foreach (var op in ops.Where(o => o.Type is MigrationOperationType.DropDefault))
-            sqlBatch.Add(MigrationBuilder.BuildDropDefault(op.Schema, op.Table, op.Column!));
+            sqlBatch.Add(MigrationBuilderSql.BuildDropDefault(op.Schema, op.Table, op.Column!));
 
         foreach (var op in ops.Where(o => o.Type is MigrationOperationType.DropConstraint))
-            sqlBatch.Add(MigrationBuilder.BuildDropConstraint(op.Schema, op.Table, op.ConstraintName!));
+            sqlBatch.Add(MigrationBuilderSql.BuildDropConstraint(op.Schema, op.Table, op.ConstraintName!));
 
         foreach (var op in ops.Where(o => o.Type is MigrationOperationType.DropColumn))
-            sqlBatch.Add(MigrationBuilder.BuildDropColumn(op.Schema, op.Table, op.Column!));
+            sqlBatch.Add(MigrationBuilderSql.BuildDropColumn(op.Schema, op.Table, op.Column!));
 
         foreach (var op in ops.Where(o => o.Type is MigrationOperationType.DropTable))
-            sqlBatch.Add(MigrationBuilder.BuildDropTableFromName(op.Schema, op.Table));
+            sqlBatch.Add(MigrationBuilderSql.BuildDropTableFromName(op.Schema, op.Table));
 
         // Constraints last (safer)
         foreach (var op in ops.Where(o => o.Type is MigrationOperationType.AddUnique))
-            sqlBatch.Add(MigrationBuilder.BuildAddUnique(op.Schema, op.Table, op.Column!));
+            sqlBatch.Add(MigrationBuilderSql.BuildAddUnique(op.Schema, op.Table, op.Column!));
 
         // FK add: if you want model-driven OnDelete behavior, extend MigrationOp to carry it.
         foreach (var op in ops.Where(o => o.Type is MigrationOperationType.AddForeignKey))
         {
             // Default ON DELETE NO ACTION unless you pass richer info in the op.
-            sqlBatch.Add(MigrationBuilder.BuildAddForeignKey(
+            sqlBatch.Add(MigrationBuilderSql.BuildAddForeignKey(
                 schema: op.Schema,
                 table: op.Table,
                 column: op.Column!,
@@ -127,18 +133,38 @@ public class MigrationRunner
         if (sqlBatch.Count == 0)
             return sqlBatch;
 
-        _connection.BeginTransaction();
+        await _connection.BeginTransactionAsync(ct);
         try
         {
             foreach (var sql in sqlBatch)
-                _connection.ExecuteNonQuery(_connection.CreateCommand(sql));
+                await _connection.ExecuteNonQueryAsync(_connection.CreateCommand(sql));
 
-            _connection.CommitTransaction();
+            await _connection.CommitTransactionAsync(ct);
             return sqlBatch;
         }
         catch
         {
-            _connection.RollbackTransaction();
+            await _connection.RollbackTransactionAsync(ct);
+            throw;
+        }
+    }
+
+    internal async Task ExecuteSqlAsync(List<string> sqlBatch, CancellationToken ct = default)
+    {
+        if (sqlBatch.Count == 0)
+            return;
+
+        await _connection.BeginTransactionAsync(ct);
+        try
+        {
+            foreach (var sql in sqlBatch)
+                await _connection.ExecuteNonQueryAsync(_connection.CreateCommand(sql));
+
+            await _connection.CommitTransactionAsync(ct);
+        }
+        catch
+        {
+            await _connection.RollbackTransactionAsync(ct);
             throw;
         }
     }
@@ -200,5 +226,70 @@ public class MigrationRunner
             "NOACTION" => OnDeleteBehavior.NoAction,
             _ => OnDeleteBehavior.NoAction
         };
+    }
+
+    private static List<string> ConvertOperationsToSql(IReadOnlyList<MigrationOperation> operations)
+    {
+        var sql = new List<string>();
+        foreach (var op in operations)
+        {
+            switch (op.Type)
+            {
+                case MigrationOperationType.CreateSchema:
+                    sql.Add(MigrationBuilderSql.BuildCreateSchema(op.Schema));
+                    break;
+                case MigrationOperationType.CreateTable:
+                    sql.Add(MigrationBuilderSql.BuildCreateTableFromName(op.Schema, op.Table));
+                    break;
+                case MigrationOperationType.AddColumn:
+                    sql.Add(MigrationBuilderSql.BuildAddColumn(
+                        op.Schema, op.Table, op.Column!, op.GetSqlType()!,
+                        op.IsNullable!.Value, op.DefaultSql,
+                        op.IsPrimaryKey ?? false, op.IsIdentity ?? false, op.IdentityGeneration));
+                    break;
+                case MigrationOperationType.DropTable:
+                    sql.Add(MigrationBuilderSql.BuildDropTableFromName(op.Schema, op.Table));
+                    break;
+                case MigrationOperationType.DropColumn:
+                    sql.Add(MigrationBuilderSql.BuildDropColumn(op.Schema, op.Table, op.Column!));
+                    break;
+                case MigrationOperationType.AlterColumnType:
+                    sql.Add(MigrationBuilderSql.BuildAlterColumnType(op.Schema, op.Table, op.Column!,
+                        op.GetSqlType()!));
+                    break;
+                case MigrationOperationType.AlterNullability:
+                    sql.Add(MigrationBuilderSql.BuildAlterNullability(op.Schema, op.Table, op.Column!,
+                        op.IsNullable!.Value));
+                    break;
+                case MigrationOperationType.SetDefault:
+                    sql.Add(MigrationBuilderSql.BuildSetDefault(op.Schema, op.Table, op.Column!, op.DefaultSql!));
+                    break;
+                case MigrationOperationType.DropDefault:
+                    sql.Add(MigrationBuilderSql.BuildDropDefault(op.Schema, op.Table, op.Column!));
+                    break;
+                case MigrationOperationType.AddUnique:
+                    sql.Add(MigrationBuilderSql.BuildAddUnique(op.Schema, op.Table, op.Column!));
+                    break;
+                case MigrationOperationType.DropConstraint:
+                    sql.Add(MigrationBuilderSql.BuildDropConstraint(op.Schema, op.Table, op.ConstraintName!));
+                    break;
+                case MigrationOperationType.AddForeignKey:
+                    sql.Add(MigrationBuilderSql.BuildAddForeignKey(
+                        schema: op.Schema,
+                        table: op.Table,
+                        column: op.Column!,
+                        constraintName: op.ConstraintName ?? $"{op.Table}_{op.Column}_fkey",
+                        refSchema: op.RefSchema ?? "public",
+                        refTable: op.RefTable ?? throw new InvalidOperationException("Missing ref table"),
+                        refColumn: op.RefColumn ?? "id",
+                        onDelete: ParseOnDeleteRule(op.OnDeleteRule)
+                    ));
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unsupported migration operation type: {op.Type}");
+            }
+        }
+
+        return sql;
     }
 }

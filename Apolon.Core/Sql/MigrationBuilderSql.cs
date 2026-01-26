@@ -3,7 +3,7 @@ using Apolon.Core.Mapping;
 
 namespace Apolon.Core.Sql;
 
-public static class MigrationBuilder
+internal static class MigrationBuilderSql
 {
     public static string BuildCreateSchema(string schemaName)
     {

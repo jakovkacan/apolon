@@ -5,7 +5,7 @@ using Npgsql;
 
 namespace Apolon.Core.DataAccess;
 
-internal class DbConnectionNpgsql(string connectionString) : IDbConnection
+internal class DbConnectionNpgsql(string connectionString) : IDbConnection, IAsyncDisposable
 {
     private NpgsqlConnection? _connection;
     private NpgsqlTransaction? _transaction;
@@ -116,15 +116,29 @@ internal class DbConnectionNpgsql(string connectionString) : IDbConnection
     {
         return command.ExecuteReader();
     }
-
+    
+    public Task<DbDataReader> ExecuteReaderAsync(DbCommand command)
+    {
+        return command.ExecuteReaderAsync();
+    }
+    
     public int ExecuteNonQuery(DbCommand command)
     {
         return command.ExecuteNonQuery();
+    }
+    
+    public Task<int> ExecuteNonQueryAsync(DbCommand command)    {
+        return command.ExecuteNonQueryAsync();
     }
 
     public object? ExecuteScalar(DbCommand command)
     {
         return command.ExecuteScalar();
+    }
+    
+    public Task<object?> ExecuteScalarAsync(DbCommand command)
+    {
+        return command.ExecuteScalarAsync();
     }
 
     public void BeginTransaction()
@@ -135,10 +149,26 @@ internal class DbConnectionNpgsql(string connectionString) : IDbConnection
         _transaction = _connection?.BeginTransaction();
     }
 
+    public async Task BeginTransactionAsync(CancellationToken ct = default)
+    {
+        if (_connection?.State != System.Data.ConnectionState.Open)
+            await OpenConnectionAsync();
+
+        _transaction = await _connection!.BeginTransactionAsync(ct);
+    }
+
     public void CommitTransaction()
     {
         _transaction?.Commit();
         _transaction?.Dispose();
+        _transaction = null;
+    }
+    
+    public async Task CommitTransactionAsync(CancellationToken ct = default)
+    {
+        if (_transaction == null) return;
+        await _transaction.CommitAsync(ct);
+        await _transaction.DisposeAsync();
         _transaction = null;
     }
 
@@ -148,10 +178,24 @@ internal class DbConnectionNpgsql(string connectionString) : IDbConnection
         _transaction?.Dispose();
         _transaction = null;
     }
+    
+    public async Task RollbackTransactionAsync(CancellationToken ct = default)
+    {
+        if (_transaction == null) return;
+        await _transaction.RollbackAsync(ct);
+        await _transaction.DisposeAsync();
+        _transaction = null;
+    }
 
     public void Dispose()
     {
         _transaction?.Dispose();
         _connection?.Dispose();
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _transaction?.DisposeAsync();
+        return _connection?.DisposeAsync() ?? ValueTask.CompletedTask;
     }
 }

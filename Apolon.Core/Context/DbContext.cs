@@ -60,6 +60,8 @@ public abstract class DbContext : IDisposable
         return total;
     }
     
+    public virtual Task<int> SaveChangesAsync() => Task.FromResult(SaveChanges());
+    
     private void CheckDisposed()
     {
         if (!_disposed) return;

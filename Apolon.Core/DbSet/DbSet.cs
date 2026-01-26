@@ -38,10 +38,23 @@ public class DbSet<T> : IEnumerable<T>
     // READ
     public T? Find(int id)
     {
-        var query = Query().Where(e => (int)e.GetType().GetProperty(_metadata.PrimaryKey.PropertyName)
-                .GetValue(e) == id);
+        var primaryKeyProperty = _metadata.PrimaryKey.Property;
+
+        var query = Query().Where(e =>
+            Convert.ToInt32(primaryKeyProperty.GetValue(e)) == id);
 
         return _executor.Query(query).FirstOrDefault();
+    }
+
+    public async Task<T?> FindAsync(int id)
+    {
+        var primaryKeyProperty = _metadata.PrimaryKey.Property;
+
+        var query = Query().Where(e =>
+            Convert.ToInt32(primaryKeyProperty.GetValue(e)) == id);
+
+        var list = await _executor.QueryAsync(query);
+        return list.FirstOrDefault();
     }
 
     public IQueryable<T> AsQueryable()
@@ -53,17 +66,22 @@ public class DbSet<T> : IEnumerable<T>
     {
         return new QueryBuilder<T>();
     }
-    
+
     public List<T> ExecuteQuery(QueryBuilder<T> queryBuilder)
     {
         return _executor.Query(queryBuilder);
+    }
+
+    public Task<List<T>> ExecuteQueryAsync(QueryBuilder<T> queryBuilder)
+    {
+        return _executor.QueryAsync(queryBuilder);
     }
 
     public List<T> ToList() => _executor.Query(new QueryBuilder<T>());
 
     public Task<List<T>> ToListAsync()
     {
-        return Task.FromResult(ToList());
+        return _executor.QueryAsync(new QueryBuilder<T>());
     }
 
     public List<T> Include(params Expression<Func<T, object>>[] includeProperties)
@@ -73,7 +91,7 @@ public class DbSet<T> : IEnumerable<T>
         foreach (var includeExpression in includeProperties)
         {
             var memberExpression = GetMemberExpression(includeExpression);
-            var navigationProperty = memberExpression.Member as PropertyInfo;
+            var navigationProperty = memberExpression?.Member as PropertyInfo;
 
             if (navigationProperty == null)
                 continue;
@@ -97,15 +115,64 @@ public class DbSet<T> : IEnumerable<T>
         return entities;
     }
 
-    private MemberExpression GetMemberExpression(Expression<Func<T, object>> expression)
+    // UPDATE
+    public void Update(T entity)
     {
-        if (expression.Body is MemberExpression memberExpression)
-            return memberExpression;
+        var index = _localCache.IndexOf(entity);
+        if (index >= 0)
+        {
+            _localCache[index] = entity;
+        }
 
-        if (expression.Body is UnaryExpression unaryExpression)
-            return unaryExpression.Operand as MemberExpression;
+        _changeTracker.TrackModified(entity);
+    }
 
-        throw new ArgumentException("Invalid include expression");
+    // DELETE
+    public bool Remove(T entity)
+    {
+        _changeTracker.TrackDeleted(entity);
+        return _localCache.Remove(entity);
+    }
+
+    // SAVE
+    public int SaveChanges()
+    {
+        var affectedRows = _changeTracker.NewEntities.Sum(entity => _executor.Insert((T)entity))
+                           + _changeTracker.ModifiedEntities.Sum(entity => _executor.Update((T)entity))
+                           + _changeTracker.DeletedEntities.Sum(entity => _executor.Delete((T)entity));
+
+        _changeTracker.Clear();
+        return affectedRows;
+    }
+
+    public async Task<int> SaveChangesAsync()
+    {
+        var affectedRows = 0;
+
+        foreach (var entity in _changeTracker.NewEntities)
+            affectedRows += await _executor.InsertAsync((T)entity);
+
+        foreach (var entity in _changeTracker.ModifiedEntities)
+            affectedRows += await _executor.UpdateAsync((T)entity);
+
+        foreach (var entity in _changeTracker.DeletedEntities)
+            affectedRows += await _executor.DeleteAsync((T)entity);
+
+        _changeTracker.Clear();
+        return affectedRows;
+    }
+
+    public IEnumerator<T> GetEnumerator() => _localCache.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+    private static MemberExpression? GetMemberExpression(Expression<Func<T, object>> expression)
+    {
+        return expression.Body switch
+        {
+            MemberExpression memberExpression => memberExpression,
+            UnaryExpression unaryExpression => unaryExpression.Operand as MemberExpression,
+            _ => throw new ArgumentException("Invalid include expression")
+        };
     }
 
     private void LoadCollection<TRelated>(List<T> entities, PropertyInfo navigationProperty, Type relatedType)
@@ -208,7 +275,8 @@ public class DbSet<T> : IEnumerable<T>
             while (reader.Read())
             {
                 var relatedEntity = EntityExecutor.MapEntity(reader, relatedMetadata);
-                var id = relatedMetadata.PrimaryKey.Property.GetValue(relatedEntity) ?? throw new Exception("Primary key is null");
+                var id = relatedMetadata.PrimaryKey.Property.GetValue(relatedEntity) ??
+                         throw new Exception("Primary key is null");
                 relatedEntities[id] = relatedEntity;
             }
         }
@@ -229,125 +297,4 @@ public class DbSet<T> : IEnumerable<T>
         var queryBuilderType = typeof(QueryBuilder<>).MakeGenericType(entityType);
         return Activator.CreateInstance(queryBuilderType)!;
     }
-
-
-    // UPDATE
-    public void Update(T entity)
-    {
-        var index = _localCache.IndexOf(entity);
-        if (index >= 0)
-        {
-            _localCache[index] = entity;
-        }
-
-        _changeTracker.TrackModified(entity);
-    }
-
-    // DELETE
-    public bool Remove(T entity)
-    {
-        _changeTracker.TrackDeleted(entity);
-        return _localCache.Remove(entity);
-    }
-
-    // SAVE
-    public int SaveChanges()
-    {
-        var affectedRows = _changeTracker.NewEntities.Sum(entity => _executor.Insert((T)entity))
-                           + _changeTracker.ModifiedEntities.Sum(entity => _executor.Update((T)entity))
-                           + _changeTracker.DeletedEntities.Sum(entity => _executor.Delete((T)entity));
-
-        _changeTracker.Clear();
-        return affectedRows;
-    }
-
-    // private int InsertEntity(T entity)
-    // {
-    //     var (sql, values) = _commandBuilder.BuildInsert(entity);
-    //     var command = _connection.CreateCommand(sql);
-    //
-    //     for (var i = 0; i < values.Count; i++)
-    //     {
-    //         _connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
-    //     }
-    //
-    //     return _connection.ExecuteNonQuery(command);
-    // }
-    //
-    // private int UpdateEntity(T entity)
-    // {
-    //     var (sql, values, pkValue) = _commandBuilder.BuildUpdate(entity);
-    //     var command = _connection.CreateCommand(sql);
-    //
-    //     for (var i = 0; i < values.Count; i++)
-    //     {
-    //         _connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
-    //     }
-    //
-    //     _connection.AddParameter(command, "@pk", pkValue);
-    //
-    //     return _connection.ExecuteNonQuery(command);
-    // }
-    //
-    // private int DeleteEntity(T entity)
-    // {
-    //     var (sql, pkValue) = _commandBuilder.BuildDelete(entity);
-    //
-    //     var command = _connection.CreateCommand(sql);
-    //     _connection.AddParameter(command, "@pk", pkValue);
-    //
-    //     return _connection.ExecuteNonQuery(command);
-    // }
-    //
-    // private List<T> ExecuteSql(string sql, List<ParameterMapping> parameters)
-    // {
-    //     var command = _connection.CreateCommand(sql);
-    //     foreach (var param in parameters)
-    //     {
-    //         _connection.AddParameter(command, param.Name, param.Value);
-    //     }
-    //
-    //     var result = new List<T>();
-    //     using var reader = _connection.ExecuteReader(command);
-    //
-    //     while (reader.Read())
-    //     {
-    //         result.Add(MapEntity(reader));
-    //     }
-    //
-    //     return result;
-    // }
-    //
-    // private T MapEntity(DbDataReader reader)
-    // {
-    //     var entity = Activator.CreateInstance<T>();
-    //
-    //     foreach (var column in _metadata.Columns)
-    //     {
-    //         var ordinal = reader.GetOrdinal(column.ColumnName);
-    //         var value = reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);
-    //         var convertedValue = TypeMapper.ConvertFromDb(value, column.Property.PropertyType);
-    //         column.Property.SetValue(entity, convertedValue);
-    //     }
-    //
-    //     return entity;
-    // }
-    //
-    // private static object MapRelatedEntity(DbDataReader reader, EntityMetadata metadata)
-    // {
-    //     var entity = Activator.CreateInstance(metadata.EntityType)!;
-    //
-    //     foreach (var column in metadata.Columns)
-    //     {
-    //         var ordinal = reader.GetOrdinal(column.ColumnName);
-    //         var value = reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);
-    //         var convertedValue = TypeMapper.ConvertFromDb(value, column.Property.PropertyType);
-    //         column.Property.SetValue(entity, convertedValue);
-    //     }
-    //
-    //     return entity;
-    // }
-
-    public IEnumerator<T> GetEnumerator() => _localCache.GetEnumerator();
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }

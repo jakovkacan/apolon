@@ -1,4 +1,5 @@
-﻿using Apolon.Core.Context;
+﻿using Apolon.Console.Migrations;
+using Apolon.Core.Context;
 using Apolon.Core.Migrations;
 using Apolon.DataAccess;
 using Apolon.Models;
@@ -14,6 +15,8 @@ try
     await context.Database.OpenConnectionAsync();
 
     Console.WriteLine("Connected to database.");
+    
+    context.Database.Migrate(typeof(AddCustomers));
 
     // Console.WriteLine("PATIENTS");
     // var patients = context.Patients.ToList();
@@ -37,38 +40,42 @@ try
     //     typeof(Checkup), typeof(CheckupType), typeof(Medication), typeof(Patient), typeof(Prescription), 
     // ]));
 
-    List<Type> entityTypes =
-    [
-        typeof(Test),
-        typeof(Checkup), typeof(CheckupType), typeof(Medication), typeof(Patient), typeof(Prescription), 
-    ];
-
-    var modelSnapshot = DatabaseFacade.DumpModelSchema(entityTypes.ToArray());
+    // List<Type> entityTypes =
+    // [
+    //     typeof(Test),
+    //     typeof(Checkup), typeof(CheckupType), typeof(Medication), typeof(Patient), typeof(Prescription), 
+    // ];
+    //
+    // var modelSnapshot = DatabaseFacade.DumpModelSchema(entityTypes.ToArray());
+    // var snapshot = await context.Database.DumpDbSchema();
 
     // Console.WriteLine("MODEL SCHEMA");
     // Console.WriteLine(modelSnapshot);
-
-    var snapshot = await context.Database.DumpDbSchema();
-
+    //
     // Console.WriteLine("DB SCHEMA");
     // Console.WriteLine(snapshot);
 
-    Console.WriteLine("ASSERT EQUAL");
-    Console.WriteLine(snapshot.Equals(modelSnapshot));
-
-    if (!snapshot.Equals(modelSnapshot))
-    {
-        var diffs = DatabaseFacade.DiffSchema(modelSnapshot, snapshot);
-        var diffsList = diffs.ToList();
-        diffsList.ForEach(Console.WriteLine);
-        
-        Console.WriteLine("SYNC SCHEMA");
-        var sql = await context.Database.SyncSchemaAsync(entityTypes.ToArray());
-        
-        Console.WriteLine("ASSERT EQUAL AFTER SYNC");
-        var newSnapshot = await context.Database.DumpDbSchema();
-        Console.WriteLine(newSnapshot.Equals(modelSnapshot));
-    }
+    // Console.WriteLine("ASSERT EQUAL");
+    // Console.WriteLine(snapshot.Equals(modelSnapshot));
+    //
+    // if (!snapshot.Equals(modelSnapshot))
+    // {
+    //     var diffs = DatabaseFacade.DiffSchema(modelSnapshot, snapshot);
+    //     var diffsList = diffs.ToList();
+    //     diffsList.ForEach(Console.WriteLine);
+    //     
+    //     Console.WriteLine("SYNC SCHEMA");
+    //     var sql = await context.Database.SyncSchemaAsync(entityTypes.ToArray());
+    //     
+    //     Console.WriteLine("ASSERT EQUAL AFTER SYNC");
+    //     var newSnapshot = await context.Database.DumpDbSchema();
+    //     Console.WriteLine(newSnapshot.Equals(modelSnapshot));
+    // }
+    
+    // var blogs = await db.Blogs
+    //     .Where(b => b.Rating > 3)
+    //     .OrderBy(b => b.Url)
+    //     .ToListAsync();
 
     // var query = context.Patients.Query().Where(p => p.PhoneNumber == "0123456789").ToList(context.Patients);
     // query.ForEach(Console.WriteLine);

@@ -18,14 +18,20 @@ public interface IDbConnection : IDisposable
     public void AddParameter(DbCommand command, string name, object value);
 
     public DbDataReader ExecuteReader(DbCommand command);
+    public Task<DbDataReader> ExecuteReaderAsync(DbCommand command);
 
     public int ExecuteNonQuery(DbCommand command);
+    public Task<int> ExecuteNonQueryAsync(DbCommand command);
 
     public object? ExecuteScalar(DbCommand command);
+    public Task<object?> ExecuteScalarAsync(DbCommand command);
 
     public void BeginTransaction();
+    public Task BeginTransactionAsync(CancellationToken ct);
 
     public void CommitTransaction();
+    public Task CommitTransactionAsync(CancellationToken ct);
 
     public void RollbackTransaction();
+    public Task RollbackTransactionAsync(CancellationToken ct);
 }

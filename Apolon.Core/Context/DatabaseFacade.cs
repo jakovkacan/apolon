@@ -40,9 +40,9 @@ public class DatabaseFacade
     }
 
     // Migrations
-    public void Migrate()
+    public void Migrate(Type migration)
     {
-        Console.WriteLine("Database migrations applied.");
+        _migrationRunner.RunPendingMigrations(migration);
     }
     
     public void MigrateAsync()
@@ -71,7 +71,7 @@ public class DatabaseFacade
 
         foreach (var modelType in modelTypes)
         {
-            sb.Append(MigrationBuilder.BuildCreateTable(modelType));
+            sb.Append(MigrationBuilderSql.BuildCreateTable(modelType));
         }
         
         return sb.ToString();
