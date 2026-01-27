@@ -11,6 +11,8 @@ internal static class SchemaDiffer
         var actualTables = actual.Tables.ToDictionary(t => (t.Schema, t.Table));
         var expectedTables = expected.Tables.ToDictionary(t => (t.Schema, t.Table));
 
+        actualTables.Remove(("apolon", "__apolon_migrations"));
+        
         // 1) Create schemas / tables that are missing
         foreach (var (key, expTable) in expectedTables)
         {

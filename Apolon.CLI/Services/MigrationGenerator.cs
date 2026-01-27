@@ -4,18 +4,21 @@ using Apolon.Core.Migrations.Models;
 
 namespace Apolon.CLI.Services;
 
-internal class MigrationGenerator
+internal static class MigrationGenerator
 {
-    public async Task<string> GenerateMigrationAsync(
+    public static async Task<string> GenerateMigrationAsync(
         string migrationName,
         string modelsPath,
         string migrationsPath,
         string connectionString,
         string namespaceName)
     {
+        var sanitizedName = SanitizeMigrationName(migrationName);
+
         Console.WriteLine($"Discovering entity types in: {Path.GetFullPath(modelsPath)}");
-        var entityTypes = TypeDiscovery.DiscoverEntityTypes(modelsPath);
-        Console.WriteLine($"Found {entityTypes.Length} entity types: {string.Join(", ", entityTypes.Select(t => t.Name))}");
+        var entityTypes = TypeDiscovery.DiscoverEntityTypes(modelsPath, hasTableAttribute: true);
+        Console.WriteLine(
+            $"Found {entityTypes.Length} entity types: {string.Join(", ", entityTypes.Select(t => t.Name))}");
 
         Console.WriteLine("Building model snapshot...");
         var modelSnapshot = ModelSnapshotBuilder.BuildFromModel(entityTypes);
@@ -38,14 +41,14 @@ internal class MigrationGenerator
         foreach (var op in operations)
         {
             Console.WriteLine($"  - {op.Type}: {op.Schema}.{op.Table}" +
-                             (op.Column != null ? $".{op.Column}" : ""));
+                              (op.Column != null ? $".{op.Column}" : ""));
         }
 
-        Console.WriteLine($"\nGenerating migration file: {migrationName}");
-        var migrationCode = MigrationCodeGenerator.GenerateMigrationCode(migrationName, operations, namespaceName);
+        Console.WriteLine($"\nGenerating migration file: {sanitizedName}");
+        var migrationCode = MigrationCodeGenerator.GenerateMigrationCode(sanitizedName, operations, namespaceName);
 
         var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-        var fileName = $"{timestamp}_{migrationName}.cs";
+        var fileName = $"{timestamp}_{sanitizedName}.cs";
         var fullPath = Path.Combine(migrationsPath, fileName);
 
         Directory.CreateDirectory(migrationsPath);
@@ -55,7 +58,7 @@ internal class MigrationGenerator
         return fullPath;
     }
 
-    private async Task<SchemaSnapshot> FetchDatabaseSnapshotAsync(string connectionString)
+    private static async Task<SchemaSnapshot> FetchDatabaseSnapshotAsync(string connectionString)
     {
         await using var connection = new DbConnectionNpgsql(connectionString);
         await connection.OpenConnectionAsync();
@@ -69,5 +72,26 @@ internal class MigrationGenerator
         {
             connection.CloseConnection();
         }
+    }
+
+    private static string SanitizeMigrationName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Migration name cannot be empty.", nameof(name));
+
+        // Remove invalid characters and replace spaces with underscores
+        var sanitized = new string(name
+            .Select(c => char.IsLetterOrDigit(c) ? c : '_')
+            .ToArray());
+
+        // If it starts with a digit, prefix with underscore
+        if (char.IsDigit(sanitized[0]))
+            sanitized = "_" + sanitized;
+
+        // Ensure PascalCase (capitalize first letter after sanitization)
+        if (sanitized.Length > 0 && char.IsLower(sanitized[0]))
+            sanitized = char.ToUpper(sanitized[0]) + sanitized.Substring(1);
+
+        return sanitized;
     }
 }

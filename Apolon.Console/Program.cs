@@ -1,13 +1,12 @@
 ﻿using Apolon.Console.Migrations;
 using Apolon.Core.Context;
 using Apolon.Core.Migrations;
-using Apolon.DataAccess;
 using Apolon.Models;
 
 const string connectionString =
     "Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=apolon;";
 
-var context = new ApolonDbContext(connectionString, false);
+var context = await ApolonDbContext.CreateAsync(connectionString);
 try
 {
     Console.WriteLine("Connecting to database...");
@@ -16,7 +15,7 @@ try
 
     Console.WriteLine("Connected to database.");
     
-    context.Database.Migrate(typeof(AddCustomers));
+    // context.Database.Migrate(typeof(AddCustomers));
 
     // Console.WriteLine("PATIENTS");
     // var patients = context.Patients.ToList();

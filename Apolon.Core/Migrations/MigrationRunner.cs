@@ -1,6 +1,7 @@
 ﻿using Apolon.Core.Attributes;
 using Apolon.Core.DataAccess;
 using Apolon.Core.Migrations.Models;
+using Apolon.Core.Migrations.Utils;
 using Apolon.Core.Sql;
 
 namespace Apolon.Core.Migrations;
@@ -8,48 +9,54 @@ namespace Apolon.Core.Migrations;
 public class MigrationRunner
 {
     private readonly IDbConnection _connection;
-    private readonly string _migrationsPath;
     private readonly EntityExecutor _executor;
 
-    internal MigrationRunner(IDbConnection connection, string migrationsPath = "./Migrations")
+    private MigrationRunner(IDbConnection connection)
     {
         _connection = connection;
-        _migrationsPath = migrationsPath;
         _executor = new EntityExecutor(connection);
-        // EnsureMigrationHistoryTable();
     }
 
-    public void RunPendingMigrations(params Type[] migrationTypes)
+    public static async Task<MigrationRunner> CreateAsync(
+        IDbConnection connection)
+    {
+        var runner = new MigrationRunner(connection);
+        await runner.EnsureMigrationHistoryTable();
+        return runner;
+    }
+
+    internal async Task RunPendingMigrations(params MigrationTypeWrapper[] migrationTypes)
     {
         foreach (var migrationType in migrationTypes)
         {
-            // if (!IsMigrationApplied(migrationType.Name))
-            {
-                var migration = (Migration)Activator.CreateInstance(migrationType);
-                var builder = new MigrationBuilder();
-                migration.Up(builder);
+            // if (await IsMigrationApplied(migrationType.Name)) continue;
 
-                // Convert operations to SQL and execute
-                var sqlBatch = ConvertOperationsToSql(builder.Operations);
-                ExecuteSqlAsync(sqlBatch).Wait();
+            var migration =
+                (Migration)(Activator.CreateInstance(migrationType.Type) ?? throw new InvalidOperationException());
+            var builder = new MigrationBuilder();
+            migration.Up(builder);
 
-                // RecordMigration(migrationType.Name);
-            }
+            // Convert operations to SQL and execute
+            var sqlBatch = MigrationUtils.ConvertOperationsToSql(builder.Operations);
+            await ExecuteSqlAsync(sqlBatch);
+
+            await RecordMigration(migrationType.Name);
         }
     }
 
-    public void RollbackLastMigration()
+    public async Task RollbackLastMigration()
     {
-        var lastMigration = GetLastAppliedMigration();
+        var lastMigration = await GetLastAppliedMigration();
         if (lastMigration != null)
         {
-            var migrationName = lastMigration;
-            var migrationType = Type.GetType($"Apolon.Migrations.{migrationName}");
+            var migrationType = Type.GetType($"Apolon.Migrations.{lastMigration}");
             if (migrationType != null)
             {
-                var migration = (Migration)Activator.CreateInstance(migrationType);
-                // migration.Down();
-                RemoveMigration(migrationName);
+                var builder = new MigrationBuilder();
+                var migration =
+                    (Migration)(Activator.CreateInstance(migrationType) ?? throw new InvalidOperationException());
+                migration.Down(builder);
+                await RemoveMigration(lastMigration);
             }
         }
     }
@@ -92,7 +99,8 @@ public class MigrationRunner
             sqlBatch.Add(MigrationBuilderSql.BuildAlterColumnType(op.Schema, op.Table, op.Column!, op.GetSqlType()!));
 
         foreach (var op in ops.Where(o => o.Type is MigrationOperationType.AlterNullability))
-            sqlBatch.Add(MigrationBuilderSql.BuildAlterNullability(op.Schema, op.Table, op.Column!, op.IsNullable!.Value));
+            sqlBatch.Add(
+                MigrationBuilderSql.BuildAlterNullability(op.Schema, op.Table, op.Column!, op.IsNullable!.Value));
 
         foreach (var op in ops.Where(o => o.Type is MigrationOperationType.SetDefault))
             sqlBatch.Add(MigrationBuilderSql.BuildSetDefault(op.Schema, op.Table, op.Column!, op.DefaultSql!));
@@ -125,7 +133,7 @@ public class MigrationRunner
                 refSchema: op.RefSchema ?? "public",
                 refTable: op.RefTable ?? throw new InvalidOperationException("Missing ref table"),
                 refColumn: op.RefColumn ?? "id",
-                onDelete: ParseOnDeleteRule(op.OnDeleteRule)
+                onDelete: MigrationUtils.ParseOnDeleteRule(op.OnDeleteRule)
             ));
         }
 
@@ -149,7 +157,7 @@ public class MigrationRunner
         }
     }
 
-    internal async Task ExecuteSqlAsync(List<string> sqlBatch, CancellationToken ct = default)
+    private async Task ExecuteSqlAsync(List<string> sqlBatch, CancellationToken ct = default)
     {
         if (sqlBatch.Count == 0)
             return;
@@ -169,22 +177,21 @@ public class MigrationRunner
         }
     }
 
-    private void EnsureMigrationHistoryTable()
+    private async Task EnsureMigrationHistoryTable()
     {
-        var sql = @"
-            CREATE TABLE IF NOT EXISTS public.__EFMigrationsHistory (
-                migration_id VARCHAR(150) PRIMARY KEY,
-                product_version VARCHAR(32) NOT NULL,
-                applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        ";
-        _connection.ExecuteNonQuery(_connection.CreateCommand(sql));
+        List<string> sql =
+        [
+            MigrationBuilderSql.BuildCreateSchema("apolon"),
+            MigrationBuilderSql.BuildCreateTable(typeof(MigrationHistoryTable))
+        ];
+
+        await ExecuteSqlAsync(sql);
     }
 
-    private bool IsMigrationApplied(string migrationId)
+    private async Task<bool> IsMigrationApplied(string migrationName)
     {
-        var qb = new QueryBuilder<MigrationHistory>()
-            .Where(m => m.MigrationId == migrationId);
+        var qb = new QueryBuilder<MigrationHistoryTable>()
+            .Where(m => m.MigrationName == migrationName);
 
         var command = _connection.CreateCommand(qb.Build());
         foreach (var param in qb.GetParameters())
@@ -192,104 +199,26 @@ public class MigrationRunner
             _connection.AddParameter(command, param.Name, param.Value);
         }
 
-        return _connection.ExecuteScalar(command) != null;
+        return await _connection.ExecuteScalarAsync(command) != null;
     }
 
-    private void RecordMigration(string migrationId)
+    private async Task RecordMigration(string migrationName, string? productVersion = null)
     {
-        _executor.Insert(new MigrationHistory { MigrationId = migrationId, ProductVersion = "1.0" });
+        await _executor.InsertAsync(new MigrationHistoryTable
+            { MigrationName = migrationName, ProductVersion = productVersion });
     }
 
-    private void RemoveMigration(string migrationId)
+    private async Task RemoveMigration(string migrationName)
     {
-        _executor.Delete(new MigrationHistory { MigrationId = migrationId });
+        await _executor.DeleteAsync(new MigrationHistoryTable { MigrationName = migrationName });
     }
 
-    private string? GetLastAppliedMigration()
+    private async Task<string?> GetLastAppliedMigration()
     {
-        var qb = new QueryBuilder<MigrationHistory>()
+        var qb = new QueryBuilder<MigrationHistoryTable>()
             .OrderByDescending(m => m.AppliedAt)
             .Take(1);
 
-        return _connection.ExecuteScalar(_connection.CreateCommand(qb.Build()))?.ToString();
-    }
-
-    private static OnDeleteBehavior ParseOnDeleteRule(string? rule)
-    {
-        return rule?.ToUpperInvariant() switch
-        {
-            "CASCADE" => OnDeleteBehavior.Cascade,
-            "RESTRICT" => OnDeleteBehavior.Restrict,
-            "SET NULL" => OnDeleteBehavior.SetNull,
-            "SET DEFAULT" => OnDeleteBehavior.SetDefault,
-            "NO ACTION" => OnDeleteBehavior.NoAction,
-            "NOACTION" => OnDeleteBehavior.NoAction,
-            _ => OnDeleteBehavior.NoAction
-        };
-    }
-
-    private static List<string> ConvertOperationsToSql(IReadOnlyList<MigrationOperation> operations)
-    {
-        var sql = new List<string>();
-        foreach (var op in operations)
-        {
-            switch (op.Type)
-            {
-                case MigrationOperationType.CreateSchema:
-                    sql.Add(MigrationBuilderSql.BuildCreateSchema(op.Schema));
-                    break;
-                case MigrationOperationType.CreateTable:
-                    sql.Add(MigrationBuilderSql.BuildCreateTableFromName(op.Schema, op.Table));
-                    break;
-                case MigrationOperationType.AddColumn:
-                    sql.Add(MigrationBuilderSql.BuildAddColumn(
-                        op.Schema, op.Table, op.Column!, op.GetSqlType()!,
-                        op.IsNullable!.Value, op.DefaultSql,
-                        op.IsPrimaryKey ?? false, op.IsIdentity ?? false, op.IdentityGeneration));
-                    break;
-                case MigrationOperationType.DropTable:
-                    sql.Add(MigrationBuilderSql.BuildDropTableFromName(op.Schema, op.Table));
-                    break;
-                case MigrationOperationType.DropColumn:
-                    sql.Add(MigrationBuilderSql.BuildDropColumn(op.Schema, op.Table, op.Column!));
-                    break;
-                case MigrationOperationType.AlterColumnType:
-                    sql.Add(MigrationBuilderSql.BuildAlterColumnType(op.Schema, op.Table, op.Column!,
-                        op.GetSqlType()!));
-                    break;
-                case MigrationOperationType.AlterNullability:
-                    sql.Add(MigrationBuilderSql.BuildAlterNullability(op.Schema, op.Table, op.Column!,
-                        op.IsNullable!.Value));
-                    break;
-                case MigrationOperationType.SetDefault:
-                    sql.Add(MigrationBuilderSql.BuildSetDefault(op.Schema, op.Table, op.Column!, op.DefaultSql!));
-                    break;
-                case MigrationOperationType.DropDefault:
-                    sql.Add(MigrationBuilderSql.BuildDropDefault(op.Schema, op.Table, op.Column!));
-                    break;
-                case MigrationOperationType.AddUnique:
-                    sql.Add(MigrationBuilderSql.BuildAddUnique(op.Schema, op.Table, op.Column!));
-                    break;
-                case MigrationOperationType.DropConstraint:
-                    sql.Add(MigrationBuilderSql.BuildDropConstraint(op.Schema, op.Table, op.ConstraintName!));
-                    break;
-                case MigrationOperationType.AddForeignKey:
-                    sql.Add(MigrationBuilderSql.BuildAddForeignKey(
-                        schema: op.Schema,
-                        table: op.Table,
-                        column: op.Column!,
-                        constraintName: op.ConstraintName ?? $"{op.Table}_{op.Column}_fkey",
-                        refSchema: op.RefSchema ?? "public",
-                        refTable: op.RefTable ?? throw new InvalidOperationException("Missing ref table"),
-                        refColumn: op.RefColumn ?? "id",
-                        onDelete: ParseOnDeleteRule(op.OnDeleteRule)
-                    ));
-                    break;
-                default:
-                    throw new InvalidOperationException($"Unsupported migration operation type: {op.Type}");
-            }
-        }
-
-        return sql;
+        return (await _connection.ExecuteScalarAsync(_connection.CreateCommand(qb.Build())))?.ToString();
     }
 }

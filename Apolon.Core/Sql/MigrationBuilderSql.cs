@@ -15,7 +15,7 @@ internal static class MigrationBuilderSql
         var metadata = EntityMapper.GetMetadata(entityType);
         var lines = new List<string>
         {
-            $"CREATE TABLE {metadata.Schema}.{metadata.TableName} ("
+            $"CREATE TABLE IF NOT EXISTS {metadata.Schema}.{metadata.TableName} ("
         };
 
         // Add columns

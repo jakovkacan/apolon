@@ -10,16 +10,13 @@ internal static class MigrationCodeGenerator
         IReadOnlyList<MigrationOperation> operations,
         string namespaceName)
     {
-        var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-        var className = $"{timestamp}_{migrationName}";
-
         var sb = new StringBuilder();
         sb.AppendLine("using Apolon.Core.Migrations;");
         sb.AppendLine("using Apolon.Core.Migrations.Models;");
         sb.AppendLine();
         sb.AppendLine($"namespace {namespaceName};");
         sb.AppendLine();
-        sb.AppendLine($"public sealed class {className} : Migration");
+        sb.AppendLine($"public sealed class {migrationName} : Migration");
         sb.AppendLine("{");
 
         // Generate Up() method
@@ -39,7 +36,8 @@ internal static class MigrationCodeGenerator
         return sb.ToString();
     }
 
-    private static void GenerateOperations(StringBuilder sb, IReadOnlyList<MigrationOperation> operations, string indent)
+    private static void GenerateOperations(StringBuilder sb, IReadOnlyList<MigrationOperation> operations,
+        string indent)
     {
         // Track unique schemas to avoid duplicate CreateSchema calls
         var createdSchemas = new HashSet<string>();
@@ -67,31 +65,38 @@ internal static class MigrationCodeGenerator
                     break;
 
                 case MigrationOperationType.DropColumn:
-                    sb.AppendLine($"{indent}migrationBuilder.DropColumn(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\");");
+                    sb.AppendLine(
+                        $"{indent}migrationBuilder.DropColumn(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\");");
                     break;
 
                 case MigrationOperationType.AlterColumnType:
-                    sb.AppendLine($"{indent}migrationBuilder.AlterColumnType(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\", \"{op.GetSqlType()}\");");
+                    sb.AppendLine(
+                        $"{indent}migrationBuilder.AlterColumnType(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\", \"{op.GetSqlType()}\");");
                     break;
 
                 case MigrationOperationType.AlterNullability:
-                    sb.AppendLine($"{indent}migrationBuilder.AlterNullability(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\", {(op.IsNullable!.Value ? "true" : "false")});");
+                    sb.AppendLine(
+                        $"{indent}migrationBuilder.AlterNullability(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\", {(op.IsNullable!.Value ? "true" : "false")});");
                     break;
 
                 case MigrationOperationType.SetDefault:
-                    sb.AppendLine($"{indent}migrationBuilder.SetDefault(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\", \"{EscapeString(op.DefaultSql!)}\");");
+                    sb.AppendLine(
+                        $"{indent}migrationBuilder.SetDefault(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\", \"{EscapeString(op.DefaultSql!)}\");");
                     break;
 
                 case MigrationOperationType.DropDefault:
-                    sb.AppendLine($"{indent}migrationBuilder.DropDefault(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\");");
+                    sb.AppendLine(
+                        $"{indent}migrationBuilder.DropDefault(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\");");
                     break;
 
                 case MigrationOperationType.AddUnique:
-                    sb.AppendLine($"{indent}migrationBuilder.AddUnique(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\");");
+                    sb.AppendLine(
+                        $"{indent}migrationBuilder.AddUnique(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\");");
                     break;
 
                 case MigrationOperationType.DropConstraint:
-                    sb.AppendLine($"{indent}migrationBuilder.DropConstraint(\"{op.Schema}\", \"{op.Table}\", \"{op.ConstraintName}\");");
+                    sb.AppendLine(
+                        $"{indent}migrationBuilder.DropConstraint(\"{op.Schema}\", \"{op.Table}\", \"{op.ConstraintName}\");");
                     break;
 
                 case MigrationOperationType.AddForeignKey:
@@ -102,7 +107,8 @@ internal static class MigrationCodeGenerator
         }
     }
 
-    private static void GenerateReverseOperations(StringBuilder sb, IReadOnlyList<MigrationOperation> operations, string indent)
+    private static void GenerateReverseOperations(StringBuilder sb, IReadOnlyList<MigrationOperation> operations,
+        string indent)
     {
         // Reverse operations in reverse order
         var reversedOps = operations.Reverse().ToList();
@@ -124,7 +130,8 @@ internal static class MigrationCodeGenerator
                 case MigrationOperationType.AddColumn:
                     // Only drop column if table wasn't dropped
                     if (!droppedTables.Contains((op.Schema, op.Table)))
-                        sb.AppendLine($"{indent}migrationBuilder.DropColumn(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\");");
+                        sb.AppendLine(
+                            $"{indent}migrationBuilder.DropColumn(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\");");
                     break;
 
                 case MigrationOperationType.DropColumn:
@@ -133,7 +140,8 @@ internal static class MigrationCodeGenerator
 
                 case MigrationOperationType.AlterColumnType:
                 case MigrationOperationType.AlterNullability:
-                    sb.AppendLine($"{indent}// TODO: Revert column changes for \"{op.Schema}.{op.Table}.{op.Column}\" if needed");
+                    sb.AppendLine(
+                        $"{indent}// TODO: Revert column changes for \"{op.Schema}.{op.Table}.{op.Column}\" if needed");
                     break;
             }
         }
@@ -189,6 +197,6 @@ internal static class MigrationCodeGenerator
 
     private static string EscapeString(string value)
     {
-        return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        return value.Replace("\\", @"\\").Replace("\"", "\\\"");
     }
 }

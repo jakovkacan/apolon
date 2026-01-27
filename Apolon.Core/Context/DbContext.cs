@@ -7,7 +7,7 @@ public abstract class DbContext : IDisposable
 {
     private readonly DbConnectionNpgsql _connection;
     private readonly Dictionary<Type, object> _dbSets = new();
-    private readonly DatabaseFacade _database;
+    private DatabaseFacade? _database;
     private bool _disposed;
     
 
@@ -15,8 +15,16 @@ public abstract class DbContext : IDisposable
     {
         _connection = new DbConnectionNpgsql(connectionString);
         _connection.OpenConnection();
-        _database = new DatabaseFacade(_connection);
         _disposed = false;
+    }
+    
+    protected static async Task<T> CreateAsync<T>(string connectionString) where T : DbContext
+    {
+        var context = (T)Activator.CreateInstance(typeof(T), 
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, 
+            null, [connectionString], null)!;
+        context._database = await DatabaseFacade.CreateAsync(context._connection);
+        return context;
     }
 
     public virtual DatabaseFacade Database
@@ -24,7 +32,7 @@ public abstract class DbContext : IDisposable
         get
         {
             CheckDisposed();
-            return _database;
+            return _database ?? throw new InvalidOperationException("Database not initialized. Use CreateAsync.");;
         }
     }
 
@@ -75,5 +83,13 @@ public abstract class DbContext : IDisposable
         _disposed = true;
         _connection?.Dispose();
         GC.SuppressFinalize(this);
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        
+        _disposed = true;
+        await _connection.DisposeAsync();
     }
 }

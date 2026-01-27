@@ -1,13 +1,19 @@
 ﻿using Apolon.Core.Context;
 using Apolon.Core.DbSet;
-using Apolon.Models;
 
-namespace Apolon.DataAccess;
+namespace Apolon.Models;
 
-public class ApolonDbContext(string connectionString, bool openConnection = true)
-    : DbContext(connectionString, openConnection)
+public class ApolonDbContext : DbContext
 {
-    // Domain-specific DbSets exposed as properties
+    private ApolonDbContext(string connectionString) : base(connectionString)
+    {
+    }
+
+    public static Task<ApolonDbContext> CreateAsync(string connectionString)
+    {
+        return CreateAsync<ApolonDbContext>(connectionString);
+    }
+
     public DbSet<Patient> Patients => Set<Patient>();
     public DbSet<Checkup> Checkups => Set<Checkup>();
     public DbSet<Medication> Medications => Set<Medication>();

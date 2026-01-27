@@ -11,10 +11,16 @@ public class DatabaseFacade
     private readonly IDbConnection _connection;
     private readonly MigrationRunner _migrationRunner;
     
-    internal DatabaseFacade(IDbConnection connection)
+    private DatabaseFacade(IDbConnection connection, MigrationRunner migrationRunner)
     {
         _connection = connection;
-        _migrationRunner = new MigrationRunner(connection);
+        _migrationRunner =  migrationRunner;
+    }
+    
+    public static async Task<DatabaseFacade> CreateAsync(IDbConnection connection)
+    {
+        var migrationRunner = await MigrationRunner.CreateAsync(connection);
+        return new DatabaseFacade(connection, migrationRunner);
     }
     
     // Connection
@@ -42,7 +48,7 @@ public class DatabaseFacade
     // Migrations
     public void Migrate(Type migration)
     {
-        _migrationRunner.RunPendingMigrations(migration);
+        // _migrationRunner.RunPendingMigrations(migration);
     }
     
     public void MigrateAsync()

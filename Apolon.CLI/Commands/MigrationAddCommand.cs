@@ -14,27 +14,25 @@ internal static class MigrationAddCommand
             "name",
             "The name of the migration (e.g., AddCustomers)");
 
-        var modelsPathOption = new Option<string>(
+        var modelsPathOption = new Option<string?>(
             aliases: ["--models-path", "-m"],
-            getDefaultValue: () => "./Models",
-            description: "Path to the models directory or assembly");
+            getDefaultValue: () => null,
+            description: "Path to the models directory or assembly (defaults to config)");
 
-        var migrationsPathOption = new Option<string>(
+        var migrationsPathOption = new Option<string?>(
             aliases: ["--migrations-path", "-o"],
-            getDefaultValue: () => "./Migrations",
-            description: "Output path for generated migrations");
+            getDefaultValue: () => null,
+            description: "Output path for generated migrations (defaults to config)");
 
-        var connectionStringOption = new Option<string>(
+        var connectionStringOption = new Option<string?>(
             aliases: ["--connection-string", "-c"],
-            description: "Database connection string")
-        {
-            IsRequired = true
-        };
+            getDefaultValue: () => null,
+            description: "Database connection string (defaults to config)");
 
-        var namespaceOption = new Option<string>(
+        var namespaceOption = new Option<string?>(
             aliases: ["--namespace", "-n"],
-            getDefaultValue: () => "Migrations",
-            description: "Namespace for the generated migration class");
+            getDefaultValue: () => null,
+            description: "Namespace for the generated migration class (defaults to config)");
 
         command.AddArgument(migrationNameArg);
         command.AddOption(modelsPathOption);
@@ -45,15 +43,29 @@ internal static class MigrationAddCommand
         command.SetHandler(async (InvocationContext context) =>
         {
             var migrationName = context.ParseResult.GetValueForArgument(migrationNameArg);
-            var modelsPath = context.ParseResult.GetValueForOption(modelsPathOption)!;
-            var migrationsPath = context.ParseResult.GetValueForOption(migrationsPathOption)!;
-            var connectionString = context.ParseResult.GetValueForOption(connectionStringOption)!;
-            var namespaceName = context.ParseResult.GetValueForOption(namespaceOption)!;
+            var modelsPathOverride = context.ParseResult.GetValueForOption(modelsPathOption);
+            var migrationsPathOverride = context.ParseResult.GetValueForOption(migrationsPathOption);
+            var connectionStringOverride = context.ParseResult.GetValueForOption(connectionStringOption);
+            var namespaceOverride = context.ParseResult.GetValueForOption(namespaceOption);
 
             try
             {
-                var generator = new MigrationGenerator();
-                var filePath = await generator.GenerateMigrationAsync(
+                // Load configuration (throws if not initialized)
+                var config = await ProjectConfiguration.LoadOrThrowAsync(Directory.GetCurrentDirectory());
+                
+                // Use overrides or fall back to config
+                var modelsPath = modelsPathOverride ?? config.ModelsPath;
+                var migrationsPath = migrationsPathOverride ?? config.MigrationsPath;
+                var connectionString = connectionStringOverride ?? config.ConnectionString;
+                var namespaceName = namespaceOverride ?? config.Namespace;
+                
+                Console.WriteLine("Using configuration:");
+                Console.WriteLine($"  Models: {modelsPath}");
+                Console.WriteLine($"  Migrations: {migrationsPath}");
+                Console.WriteLine($"  Namespace: {namespaceName}");
+                Console.WriteLine();
+                
+                var filePath = await MigrationGenerator.GenerateMigrationAsync(
                     migrationName,
                     modelsPath,
                     migrationsPath,
@@ -62,23 +74,23 @@ internal static class MigrationAddCommand
 
                 if (string.IsNullOrEmpty(filePath))
                 {
-                    context.ExitCode = 0;
                 }
                 else
                 {
-                    Console.WriteLine("\n✓ Migration generation completed successfully!");
-                    context.ExitCode = 0;
+                    Console.WriteLine("\nMigration generation completed successfully!");
                 }
+
+                context.ExitCode = 0;
             }
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.Error.WriteLine($"\n✗ Error: {ex.Message}");
+                await Console.Error.WriteLineAsync($"\nError: {ex.Message}");
                 Console.ResetColor();
 
                 if (ex.InnerException != null)
                 {
-                    Console.Error.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                    await Console.Error.WriteLineAsync($"Inner exception: {ex.InnerException.Message}");
                 }
 
                 context.ExitCode = 1;

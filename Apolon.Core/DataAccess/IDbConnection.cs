@@ -27,11 +27,11 @@ public interface IDbConnection : IDisposable
     public Task<object?> ExecuteScalarAsync(DbCommand command);
 
     public void BeginTransaction();
-    public Task BeginTransactionAsync(CancellationToken ct);
+    public Task BeginTransactionAsync(CancellationToken ct = default);
 
     public void CommitTransaction();
-    public Task CommitTransactionAsync(CancellationToken ct);
+    public Task CommitTransactionAsync(CancellationToken ct = default);
 
     public void RollbackTransaction();
-    public Task RollbackTransactionAsync(CancellationToken ct);
+    public Task RollbackTransactionAsync(CancellationToken ct = default);
 }

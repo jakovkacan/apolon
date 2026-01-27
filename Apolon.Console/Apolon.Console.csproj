@@ -9,7 +9,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Apolon.Core\Apolon.Core.csproj" />
-      <ProjectReference Include="..\Apolon.DataAccess\Apolon.DataAccess.csproj" />
+      <ProjectReference Include="..\Apolon.Models\Apolon.Models.csproj" />
     </ItemGroup>
 
 </Project>
