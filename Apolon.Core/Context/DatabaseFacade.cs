@@ -97,11 +97,11 @@ public class DatabaseFacade
         return schemaSnapshot;
     }
     
-    public static IReadOnlyList<MigrationOperation> DiffSchema(SchemaSnapshot expected, SchemaSnapshot actual)
-    {
-        var ops = SchemaDiffer.Diff(expected, actual);
-        return ops;
-    }
+    // public static IReadOnlyList<MigrationOperation> DiffSchema(SchemaSnapshot expected, SchemaSnapshot actual)
+    // {
+    //     var ops = SchemaDiffer.Diff(expected, actual);
+    //     return ops;
+    // }
     
     public Task<IReadOnlyList<string>> SyncSchemaAsync(params Type[] entityTypes)
     {

@@ -74,7 +74,7 @@ internal static class DatabaseUpdateCommand
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                await Console.Error.WriteLineAsync($"\n✗ Error: {ex.Message}");
+                await Console.Error.WriteLineAsync($"\nError: {ex.Message}");
                 Console.ResetColor();
 
                 if (ex.InnerException != null)
@@ -94,19 +94,18 @@ internal static class DatabaseUpdateCommand
         // Mask password in connection string for display
         var masked = connectionString;
         var passwordIndex = masked.IndexOf("Password=", StringComparison.OrdinalIgnoreCase);
+
+        if (passwordIndex < 0) return masked;
         
-        if (passwordIndex >= 0)
-        {
-            var start = passwordIndex + "Password=".Length;
-            var end = masked.IndexOf(';', start);
+        var start = passwordIndex + "Password=".Length;
+        var end = masked.IndexOf(';', start);
             
-            if (end < 0)
-                end = masked.Length;
+        if (end < 0)
+            end = masked.Length;
             
-            var passwordLength = end - start;
-            masked = masked.Substring(0, start) + new string('*', Math.Min(passwordLength, 8)) + masked.Substring(end);
-        }
-        
+        var passwordLength = end - start;
+        masked = string.Concat(masked.AsSpan()[..start], new string('*', Math.Min(passwordLength, 8)), masked.AsSpan(end));
+
         return masked;
     }
 }

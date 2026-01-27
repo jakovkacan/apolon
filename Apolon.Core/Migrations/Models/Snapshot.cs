@@ -19,8 +19,8 @@ public sealed record SchemaSnapshot(
         if (ReferenceEquals(this, other)) return true;
 
         // Compare by content, not by list reference; also ignore ordering differences.
-        var a = Tables.OrderBy(t => t.Schema).ThenBy(t => t.Table).ToArray();
-        var b = other.Tables.OrderBy(t => t.Schema).ThenBy(t => t.Table).ToArray();
+        var a = Tables.OrderBy(t => t.Schema).ThenBy(t => t.Name).ToArray();
+        var b = other.Tables.OrderBy(t => t.Schema).ThenBy(t => t.Name).ToArray();
 
         return a.SequenceEqual(b);
     }
@@ -29,7 +29,7 @@ public sealed record SchemaSnapshot(
     {
         // Stable structural hash: order by key, then fold in element hashes.
         var hc = new HashCode();
-        foreach (var t in Tables.OrderBy(t => t.Schema).ThenBy(t => t.Table))
+        foreach (var t in Tables.OrderBy(t => t.Schema).ThenBy(t => t.Name))
             hc.Add(t);
         return hc.ToHashCode();
     }
@@ -39,8 +39,8 @@ public sealed record SchemaSnapshot(
     {
         var diffs = new List<string>();
 
-        var leftTables = Tables.ToDictionary(t => (t.Schema, t.Table));
-        var rightTables = other.Tables.ToDictionary(t => (t.Schema, t.Table));
+        var leftTables = Tables.ToDictionary(t => (t.Schema, Table: t.Name));
+        var rightTables = other.Tables.ToDictionary(t => (t.Schema, Table: t.Name));
 
         foreach (var key in leftTables.Keys.Except(rightTables.Keys).OrderBy(k => k.Schema).ThenBy(k => k.Table))
             diffs.Add($"Table missing in OTHER: {key.Schema}.{key.Table}");
@@ -117,7 +117,7 @@ public sealed record SchemaSnapshot(
 
 public sealed record TableSnapshot(
     string Schema,
-    string Table,
+    string Name,
     IReadOnlyList<ColumnSnapshot> Columns
 )
 {
@@ -126,7 +126,7 @@ public sealed record TableSnapshot(
         if (other is null) return false;
         if (ReferenceEquals(this, other)) return true;
 
-        if (Schema != other.Schema || Table != other.Table)
+        if (Schema != other.Schema || Name != other.Name)
             return false;
 
         // Compare by content, not list reference; ignore ordering differences.
@@ -140,7 +140,7 @@ public sealed record TableSnapshot(
     {
         var hc = new HashCode();
         hc.Add(Schema);
-        hc.Add(Table);
+        hc.Add(Name);
         foreach (var c in Columns.OrderBy(c => c.ColumnName))
             hc.Add(c);
         return hc.ToHashCode();
@@ -152,7 +152,7 @@ public sealed record TableSnapshot(
             ? "  (no columns)"
             : string.Join(Environment.NewLine, Columns.Select(c => "  - " + c));
 
-        return $"{Schema}.{Table}{Environment.NewLine}{columnsText}";
+        return $"{Schema}.{Name}{Environment.NewLine}{columnsText}";
     }
 }
 

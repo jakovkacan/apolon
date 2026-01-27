@@ -4,22 +4,25 @@ namespace Apolon.Core.Migrations;
 
 internal static class SchemaDiffer
 {
-    public static IReadOnlyList<MigrationOperation> Diff(SchemaSnapshot expected, SchemaSnapshot actual)
+    public static IReadOnlyList<MigrationOperation> Diff(SchemaSnapshot expected, SchemaSnapshot actual,
+        MigrationOperation[]? commitedOperations = null)
     {
         var ops = new List<MigrationOperation>();
 
-        var actualTables = actual.Tables.ToDictionary(t => (t.Schema, t.Table));
-        var expectedTables = expected.Tables.ToDictionary(t => (t.Schema, t.Table));
+        var actualTables = actual.Tables.ToDictionary(t => (t.Schema, Table: t.Name));
+        var expectedTables = expected.Tables.ToDictionary(t => (t.Schema, Table: t.Name));
 
-        actualTables.Remove(("apolon", "__apolon_migrations"));
-        
+        // Remove migration history table from actual tables
+        var migrationSnapshotTable = ModelSnapshotBuilder.BuildFromModel(typeof(MigrationHistoryTable)).Tables[0];
+        actualTables.Remove((migrationSnapshotTable.Schema, migrationSnapshotTable.Name));
+
         // 1) Create schemas / tables that are missing
         foreach (var (key, expTable) in expectedTables)
         {
             if (actualTables.ContainsKey(key)) continue;
-            
-            ops.Add(new MigrationOperation(MigrationOperationType.CreateSchema, expTable.Schema, expTable.Table));
-            ops.Add(new MigrationOperation(MigrationOperationType.CreateTable, expTable.Schema, expTable.Table));
+
+            ops.Add(new MigrationOperation(MigrationOperationType.CreateSchema, expTable.Schema, expTable.Name));
+            ops.Add(new MigrationOperation(MigrationOperationType.CreateTable, expTable.Schema, expTable.Name));
 
             // Add all columns for newly created tables.
             foreach (var expCol in expTable.Columns)
@@ -36,7 +39,7 @@ internal static class SchemaDiffer
             ops.Add(new MigrationOperation(
                 MigrationOperationType.DropTable,
                 actTable.Schema,
-                actTable.Table
+                actTable.Name
             ));
         }
 
@@ -53,7 +56,7 @@ internal static class SchemaDiffer
             foreach (var (colName, expCol) in expCols)
             {
                 if (actCols.ContainsKey(colName)) continue;
-                
+
                 AddColumnOps(ops, expTable, expCol);
             }
 
@@ -65,7 +68,7 @@ internal static class SchemaDiffer
                 ops.Add(new MigrationOperation(
                     MigrationOperationType.DropColumn,
                     expTable.Schema,
-                    expTable.Table,
+                    expTable.Name,
                     Column: actCol.ColumnName
                 ));
             }
@@ -81,7 +84,7 @@ internal static class SchemaDiffer
                     ops.Add(new MigrationOperation(
                         MigrationOperationType.AlterColumnType,
                         expTable.Schema,
-                        expTable.Table,
+                        expTable.Name,
                         Column: colName,
                         SqlType: expCol.DataType,
                         CharacterMaximumLength: expCol.CharacterMaximumLength,
@@ -96,7 +99,7 @@ internal static class SchemaDiffer
                     ops.Add(new MigrationOperation(
                         MigrationOperationType.AlterNullability,
                         expTable.Schema,
-                        expTable.Table,
+                        expTable.Name,
                         Column: colName,
                         IsNullable: expCol.IsNullable
                     ));
@@ -110,7 +113,7 @@ internal static class SchemaDiffer
                         ops.Add(new MigrationOperation(
                             MigrationOperationType.DropDefault,
                             expTable.Schema,
-                            expTable.Table,
+                            expTable.Name,
                             Column: colName
                         ));
                     }
@@ -119,7 +122,7 @@ internal static class SchemaDiffer
                         ops.Add(new MigrationOperation(
                             MigrationOperationType.SetDefault,
                             expTable.Schema,
-                            expTable.Table,
+                            expTable.Name,
                             Column: colName,
                             DefaultSql: expCol.ColumnDefault
                         ));
@@ -136,13 +139,13 @@ internal static class SchemaDiffer
                     ));
 
                 if (!fkMismatch) continue;
-                
+
                 if (actCol.IsForeignKey && !string.IsNullOrWhiteSpace(actCol.FkConstraintName))
                 {
                     ops.Add(new MigrationOperation(
                         MigrationOperationType.DropConstraint,
                         expTable.Schema,
-                        expTable.Table,
+                        expTable.Name,
                         ConstraintName: actCol.FkConstraintName
                     ));
                 }
@@ -152,7 +155,7 @@ internal static class SchemaDiffer
                     ops.Add(new MigrationOperation(
                         Type: MigrationOperationType.AddForeignKey,
                         Schema: expTable.Schema,
-                        Table: expTable.Table,
+                        Table: expTable.Name,
                         Column: colName,
                         ConstraintName: expCol.FkConstraintName,
                         RefSchema: expCol.ReferencesSchema,
@@ -162,6 +165,11 @@ internal static class SchemaDiffer
                     ));
                 }
             }
+        }
+
+        if (commitedOperations != null)
+        {
+            ops.RemoveAll(commitedOperations.Contains);
         }
 
         // Important ordering note:
@@ -179,7 +187,7 @@ internal static class SchemaDiffer
         ops.Add(new MigrationOperation(
             Type: MigrationOperationType.AddColumn,
             Schema: expTable.Schema,
-            Table: expTable.Table,
+            Table: expTable.Name,
             Column: expCol.ColumnName,
             SqlType: expCol.DataType,
             CharacterMaximumLength: expCol.CharacterMaximumLength,
@@ -198,7 +206,7 @@ internal static class SchemaDiffer
             ops.Add(new MigrationOperation(
                 Type: MigrationOperationType.AddUnique,
                 Schema: expTable.Schema,
-                Table: expTable.Table,
+                Table: expTable.Name,
                 Column: expCol.ColumnName
             ));
         }
@@ -208,7 +216,7 @@ internal static class SchemaDiffer
             ops.Add(new MigrationOperation(
                 Type: MigrationOperationType.AddForeignKey,
                 Schema: expTable.Schema,
-                Table: expTable.Table,
+                Table: expTable.Name,
                 Column: expCol.ColumnName,
                 ConstraintName: expCol.FkConstraintName,
                 RefSchema: expCol.ReferencesSchema,

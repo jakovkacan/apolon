@@ -1,6 +1,5 @@
 ﻿namespace Apolon.Core.Migrations.Models;
 
-//TODO Make internal
 public enum MigrationOperationType
 {
     CreateSchema,
@@ -17,7 +16,6 @@ public enum MigrationOperationType
     AddForeignKey
 }
 
-//TODO Make internal
 public sealed record MigrationOperation(
     MigrationOperationType Type,
     string Schema,

@@ -8,60 +8,67 @@ internal static class TypeDiscovery
 {
     public static Type[] DiscoverEntityTypes(string path, bool hasTableAttribute = false)
     {
+        // Always try to find and build the project first to ensure latest state
+        string? projectPath = null;
+
         // Check if path is a .dll file
         if (File.Exists(path) && path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
         {
-            return DiscoverEntityTypesFromAssembly(path, hasTableAttribute);
+            projectPath = FindProjectFileForPath(path);
         }
-
         // Check if it's a directory
-        if (Directory.Exists(path))
+        else if (Directory.Exists(path))
         {
-            // First try to find .cs files (source-first approach)
-            var csFiles = Directory.GetFiles(path, "*.cs", SearchOption.TopDirectoryOnly);
-            if (csFiles.Length > 0 && (!hasTableAttribute || csFiles.Any(HasTableAttribute)))
-            {
-                return DiscoverEntityTypesFromSourceWithCompilation(path, hasTableAttribute);
-            }
-
-            // Fallback to looking for compiled assemblies
-            return DiscoverEntityTypesFromDirectory(path, hasTableAttribute);
+            projectPath = FindProjectFileForPath(path);
+        }
+        else
+        {
+            throw new InvalidOperationException($"Path not found or invalid: {path}");
         }
 
-        throw new InvalidOperationException($"Path not found or invalid: {path}");
-    }
-
-    private static bool HasTableAttribute(string filePath)
-    {
-        var content = File.ReadAllText(filePath);
-        return Regex.IsMatch(content, @"\[Table[(\[]");
-    }
-
-    private static Type[] DiscoverEntityTypesFromSourceWithCompilation(string directoryPath,
-        bool hasTableAttribute = false)
-    {
-        Console.WriteLine($"Found .cs files in {directoryPath}. Building project to discover types...");
-
-        // Find the .csproj file
-        var projectFiles = Directory.GetFiles(directoryPath, "*.csproj", SearchOption.AllDirectories)
-            .OrderBy(p => p.Length) // Prefer closest project file
-            .ToArray();
-
-        if (projectFiles.Length == 0)
+        // If we found a project file, always rebuild it
+        if (projectPath != null)
         {
-            // Look one level up
-            var parentDir = Directory.GetParent(directoryPath);
-            if (parentDir != null)
-            {
-                projectFiles = Directory.GetFiles(parentDir.FullName, "*.csproj", SearchOption.TopDirectoryOnly);
-            }
+            return BuildAndLoadTypes(projectPath, hasTableAttribute);
         }
 
-        if (projectFiles.Length == 0)
-            throw new InvalidOperationException($"No .csproj file found for source directory: {directoryPath}");
+        // Fallback: no project file found, load from existing assemblies
+        Console.WriteLine("Warning: No project file found. Loading from existing assemblies without rebuilding.");
+        if (File.Exists(path) && path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+        {
+            return LoadTypesFromAssembly(path, hasTableAttribute);
+        }
 
-        var projectFile = projectFiles[0];
-        Console.WriteLine($"Building project: {projectFile}");
+        return LoadTypesFromDirectory(path, hasTableAttribute);
+    }
+
+    private static string? FindProjectFileForPath(string path)
+    {
+        var searchDir = File.Exists(path) ? Path.GetDirectoryName(path) : path;
+
+        if (string.IsNullOrEmpty(searchDir))
+            return null;
+
+        var currentDir = new DirectoryInfo(searchDir);
+
+        // Search current directory and parent directories
+        while (currentDir is { Exists: true })
+        {
+            var projectFiles = currentDir.GetFiles("*.csproj", SearchOption.TopDirectoryOnly);
+            if (projectFiles.Length > 0)
+            {
+                return projectFiles[0].FullName;
+            }
+
+            currentDir = currentDir.Parent;
+        }
+
+        return null;
+    }
+
+    private static Type[] BuildAndLoadTypes(string projectFile, bool hasTableAttribute)
+    {
+        Console.WriteLine($"Rebuilding project to ensure latest state: {projectFile}");
 
         // Build the project
         var buildProcess = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
@@ -76,9 +83,9 @@ internal static class TypeDiscovery
 
         buildProcess?.WaitForExit();
 
-        if (buildProcess?.ExitCode != 0)
+        if (buildProcess is not { ExitCode: 0 })
         {
-            var error = buildProcess.StandardError.ReadToEnd();
+            var error = buildProcess!.StandardError.ReadToEnd();
             throw new InvalidOperationException($"Failed to build project: {projectFile}\n{error}");
         }
 
@@ -100,7 +107,7 @@ internal static class TypeDiscovery
         {
             try
             {
-                var types = DiscoverEntityTypesFromAssembly(assemblyFile, hasTableAttribute: hasTableAttribute);
+                var types = LoadTypesFromAssembly(assemblyFile, hasTableAttribute);
                 if (types.Length > 0)
                     return types;
             }
@@ -111,12 +118,27 @@ internal static class TypeDiscovery
         }
 
         throw new InvalidOperationException(
-            $"No entity types with [Table] attribute found after building: {projectFile}");
+            $"No entity types found after building: {projectFile}");
     }
 
-    private static Type[] DiscoverEntityTypesFromDirectory(string directoryPath, bool hasTableAttribute = false)
+    private static Type[] LoadTypesFromAssembly(string assemblyPath, bool hasTableAttribute)
     {
-        // Find all .dll files in the directory
+        if (!File.Exists(assemblyPath))
+            throw new FileNotFoundException($"Assembly not found: {assemblyPath}");
+
+        var assembly = Assembly.LoadFrom(assemblyPath);
+        var types = assembly.GetTypes()
+            .Where(t => !hasTableAttribute || t.GetCustomAttribute<TableAttribute>() != null)
+            .Where(t => t is { IsClass: true, IsAbstract: false })
+            .ToArray();
+
+        return types.Length == 0
+            ? throw new InvalidOperationException($"No entity types found in: {assemblyPath}")
+            : types;
+    }
+
+    private static Type[] LoadTypesFromDirectory(string directoryPath, bool hasTableAttribute)
+    {
         var assemblyFiles = Directory.GetFiles(directoryPath, "*.dll", SearchOption.AllDirectories);
 
         if (assemblyFiles.Length == 0)
@@ -145,23 +167,7 @@ internal static class TypeDiscovery
         }
 
         return entityTypes.Count == 0
-            ? throw new InvalidOperationException($"No entity types with [Table] attribute found in: {directoryPath}")
+            ? throw new InvalidOperationException($"No entity types found in: {directoryPath}")
             : entityTypes.ToArray();
-    }
-
-    private static Type[] DiscoverEntityTypesFromAssembly(string assemblyPath, bool hasTableAttribute = false)
-    {
-        if (!File.Exists(assemblyPath))
-            throw new FileNotFoundException($"Assembly not found: {assemblyPath}");
-
-        var assembly = Assembly.LoadFrom(assemblyPath);
-        var types = assembly.GetTypes()
-            .Where(t => !hasTableAttribute || t.GetCustomAttribute<TableAttribute>() != null)
-            .Where(t => t is { IsClass: true, IsAbstract: false })
-            .ToArray();
-
-        return types.Length == 0
-            ? throw new InvalidOperationException($"No entity types with [Table] attribute found in: {assemblyPath}")
-            : types;
     }
 }
