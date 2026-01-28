@@ -17,27 +17,36 @@ internal static class MigrationGenerator
         var sanitizedName = SanitizeMigrationName(migrationName);
 
         Console.WriteLine($"Discovering entity types in: {Path.GetFullPath(modelsPath)}");
-        var entityTypes = TypeDiscovery.DiscoverEntityTypes(modelsPath, hasTableAttribute: true);
+        var entityTypes = await TypeDiscovery.DiscoverEntityTypes(modelsPath, hasTableAttribute: true);
         Console.WriteLine(
             $"Found {entityTypes.Length} entity types: {string.Join(", ", entityTypes.Select(t => t.Name))}");
 
         Console.WriteLine("Building model snapshot...");
-        var modelSnapshot = ModelSnapshotBuilder.BuildFromModel(entityTypes);
+        var modelSnapshot = SnapshotBuilder.BuildFromModel(entityTypes);
 
         Console.WriteLine("Fetching database snapshot...");
         var dbSnapshot = await FetchDatabaseSnapshotAsync(connectionString);
 
+        Console.WriteLine("Fetching applied migrations...");
+        var appliedMigrations = await FetchAppliedMigrationsAsync(connectionString);
+        appliedMigrations = appliedMigrations?.Select(m => m[(m.IndexOf('_') + 1)..]).ToList();
+        
+        Console.WriteLine($"Found {appliedMigrations?.Count ?? 0} applied migrations: {string.Join(", ", appliedMigrations ?? [])}");
+
         Console.WriteLine("Fetching commited migrations...");
-        var migrationTypes = TypeDiscovery.DiscoverMigrationTypes(migrationsPath);
+        var migrationTypes = await TypeDiscovery.DiscoverMigrationTypes(migrationsPath, rebuildProject: false);
         var committedMigrations = migrationTypes
+            .Where(mt => !appliedMigrations?.Contains($"{mt.Name}") ?? true)
             .Select(mt => mt.Type)
             .ToList();
-
-        Console.WriteLine("Fetching commited operations...");
+        
+        Console.WriteLine($"Found {committedMigrations.Count} commited but not applied migrations: {string.Join(", ", committedMigrations.Select(m => m.Name))}");
+        
         var committedOperations = MigrationUtils.ExtractOperationsFromMigrationTypes(committedMigrations);
-
+        var commitedSnapshot = SnapshotBuilder.ApplyMigrations(dbSnapshot, committedOperations);
+        
         Console.WriteLine("Comparing snapshots...");
-        var operations = SchemaDiffer.Diff(modelSnapshot, dbSnapshot, committedOperations);
+        var operations = SchemaDiffer.Diff(modelSnapshot, commitedSnapshot);
         Console.WriteLine($"Found {operations.Count} migration operations");
 
         if (operations.Count == 0)
@@ -47,16 +56,16 @@ internal static class MigrationGenerator
         }
 
         // Display operations
-        // Console.WriteLine("\nOperations to be generated:");
-        // foreach (var op in operations)
-        // {
-        //     Console.WriteLine($"  - {op.Type}: {op.Schema}.{op.Table}" +
-        //                       (op.Column != null ? $".{op.Column}" : ""));
-        // }
+        Console.WriteLine("\nOperations to be generated:");
+        foreach (var op in operations)
+        {
+            Console.WriteLine($"  - {op.Type}: {op.Schema}.{op.Table}" +
+                              (op.Column != null ? $".{op.Column}" : ""));
+        }
 
         Console.WriteLine($"\nGenerating migration file: {sanitizedName}");
         var migrationCode =
-            FluentMigrationCodeGenerator.GenerateMigrationCode(sanitizedName, operations, namespaceName, committedOperations);
+            MigrationCodeGenerator.GenerateMigrationCode(sanitizedName, operations, namespaceName, committedOperations);
 
         var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
         var fileName = $"{timestamp}_{sanitizedName}.cs";
@@ -67,6 +76,15 @@ internal static class MigrationGenerator
 
         Console.WriteLine($"Migration generated successfully at: {fullPath}");
         return fullPath;
+    }
+
+    private static async Task<List<string>?> FetchAppliedMigrationsAsync(string connectionString)
+    {
+        await using var connection = new DbConnectionNpgsql(connectionString);
+        await connection.OpenConnectionAsync();
+
+        var runner = await MigrationRunner.CreateAsync(connection);
+        return await runner.GetAppliedMigrationsAsync();
     }
 
     private static async Task<SchemaSnapshot> FetchDatabaseSnapshotAsync(string connectionString)

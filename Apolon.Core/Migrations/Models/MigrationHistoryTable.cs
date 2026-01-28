@@ -10,6 +10,6 @@ public class MigrationHistoryTable
     [Column("migration_name", IsUnique = true)]
     public required string MigrationName { get; init; }
     public string? ProductVersion { get; set; }
-    [Column("applied_at", DefaultIsRawSql = true, DefaultValue = "NOW()")]
-    public DateTime AppliedAt { get; init; }
+    [Column("applied_at", DefaultIsRawSql = true, DefaultValue = "CURRENT_TIMESTAMP")]
+    public DateTime AppliedAt { get; init; } = DateTime.UtcNow;
 }

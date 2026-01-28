@@ -28,7 +28,7 @@ internal static class DatabaseRollbackCommand
         command.AddOption(connectionStringOption);
         command.AddOption(migrationsPathOption);
 
-        command.SetHandler(async (InvocationContext context) =>
+        command.SetHandler(async context =>
         {
             var targetMigration = context.ParseResult.GetValueForArgument(targetMigrationArg);
             var connectionStringOverride = context.ParseResult.GetValueForOption(connectionStringOption);
@@ -59,12 +59,12 @@ internal static class DatabaseRollbackCommand
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                await Console.Error.WriteLineAsync($"\n✗ Error: {ex.Message}");
+                await Console.Error.WriteLineAsync($"\n✗ Error: {ex.Message} {ex.StackTrace}");
                 Console.ResetColor();
 
                 if (ex.InnerException != null)
                 {
-                    await Console.Error.WriteLineAsync($"Inner exception: {ex.InnerException.Message}");
+                    await Console.Error.WriteLineAsync($"Inner exception: {ex.InnerException.Message} {ex.InnerException.StackTrace}");
                 }
 
                 context.ExitCode = 1;

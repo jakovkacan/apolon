@@ -20,7 +20,7 @@ public class Checkup : BaseEntity
     public string? Notes { get; set; }
     public string? Results { get; set; }
     
-    [NotMapped]
+    // [NotMapped]
     public string? Test { get; set; }
     
     // Navigation properties

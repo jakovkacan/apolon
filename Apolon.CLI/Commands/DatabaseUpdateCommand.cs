@@ -49,14 +49,12 @@ internal static class DatabaseUpdateCommand
                 Console.WriteLine($"Migrations: {migrationsPath}");
                 Console.WriteLine();
 
-                var executor = new MigrationExecutor();
-
                 // Determine if this is a rollback or forward migration
                 if (!string.IsNullOrEmpty(targetMigration))
                 {
                     // Check if target is already applied (rollback scenario)
                     // This will be determined inside the executor
-                    await executor.ExecuteMigrationsAsync(
+                    await MigrationExecutor.ExecuteMigrationsAsync(
                         connectionString,
                         migrationsPath,
                         targetMigration);
@@ -64,7 +62,7 @@ internal static class DatabaseUpdateCommand
                 else
                 {
                     // Apply all pending migrations
-                    await executor.ExecuteMigrationsAsync(
+                    await MigrationExecutor.ExecuteMigrationsAsync(
                         connectionString,
                         migrationsPath);
                 }

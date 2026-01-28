@@ -1,5 +1,4 @@
-﻿using Apolon.Core.Attributes;
-using Apolon.Core.DataAccess;
+﻿using Apolon.Core.DataAccess;
 using Apolon.Core.Migrations.Models;
 using Apolon.Core.Migrations.Utils;
 using Apolon.Core.Sql;
@@ -17,26 +16,155 @@ public class MigrationRunner
         _executor = new EntityExecutor(connection);
     }
 
-    public static async Task<MigrationRunner> CreateAsync(
-        IDbConnection connection)
+    public static async Task<MigrationRunner> CreateAsync(IDbConnection connection)
     {
         var runner = new MigrationRunner(connection);
         await runner.EnsureMigrationHistoryTable();
         return runner;
     }
 
-    internal async Task RunMigrations(params MigrationTypeWrapper[] migrationTypes)
+    // Public: returns currently applied migration names (stored in history)
+    public async Task<List<string>> GetAppliedMigrationsAsync(CancellationToken ct = default)
+    {
+        var qb = new QueryBuilder<MigrationHistoryTable>().OrderBy(m => m.AppliedAt);
+        var results = await _executor.QueryAsync(qb);
+
+        return results.Select(m => m.MigrationName).ToList();
+    }
+
+    // Public: determine which migrations from discovery need to be applied (fullName = "{timestamp}_{name}")
+    public static List<(Type Type, string Timestamp, string Name, string FullName)> DetermineMigrationsToRun(
+        (Type Type, string Timestamp, string Name)[] allMigrations,
+        List<string> appliedMigrations,
+        string? targetMigration)
+    {
+        var toRun = new List<(Type, string, string, string)>();
+
+        foreach (var migration in allMigrations)
+        {
+            var fullName = $"{migration.Timestamp}_{migration.Name}";
+
+            // Skip already applied
+            if (appliedMigrations.Contains(fullName))
+                continue;
+
+            toRun.Add((migration.Type, migration.Timestamp, migration.Name, fullName));
+
+            // Stop if we reached target
+            if (targetMigration != null &&
+                (migration.Name.Equals(targetMigration, StringComparison.OrdinalIgnoreCase) ||
+                 fullName.Equals(targetMigration, StringComparison.OrdinalIgnoreCase)))
+            {
+                break;
+            }
+        }
+
+        return toRun;
+    }
+
+    // Apply migrations (returns number applied)
+    public async Task<int> ApplyMigrationsAsync(
+        (Type Type, string Timestamp, string Name)[] discoveredMigrations,
+        string? targetMigration = null,
+        CancellationToken ct = default)
+    {
+        var applied = await GetAppliedMigrationsAsync(ct);
+        var toRun = DetermineMigrationsToRun(discoveredMigrations, applied, targetMigration);
+
+        if (toRun.Count == 0)
+            return 0;
+
+        var executed = 0;
+        foreach (var (type, timestamp, name, fullName) in toRun)
+        {
+            var wrapper = new MigrationTypeWrapper
+            {
+                Type = type,
+                Name = fullName,
+                Timestamp = timestamp
+            };
+
+            // Use existing internal runner to construct & execute Up
+            await RunMigrations(wrapper);
+            executed++;
+        }
+
+        return executed;
+    }
+
+    // Public: preview which migrations would be rolled back to a target (returns full names in descending order)
+    public static List<string> GetMigrationsToRollback(
+        (Type Type, string Timestamp, string Name)[] allMigrations,
+        List<string> appliedMigrations,
+        string targetMigration)
+    {
+        var target = allMigrations
+            .FirstOrDefault(m => m.Name.Equals(targetMigration, StringComparison.OrdinalIgnoreCase)
+                                 || $"{m.Timestamp}_{m.Name}".Equals(targetMigration,
+                                     StringComparison.OrdinalIgnoreCase));
+
+        var targetFull = target.Type == null ? null : $"{target.Timestamp}_{target.Name}";
+
+        if (targetFull == null)
+            throw new InvalidOperationException($"Target migration '{targetMigration}' not found.");
+
+        var list = allMigrations
+            .Select(m => new { m.Type, m.Timestamp, m.Name, Full = $"{m.Timestamp}_{m.Name}" })
+            .Where(x => string.Compare(x.Full, targetFull, StringComparison.Ordinal) > 0)
+            .Where(x => appliedMigrations.Contains(x.Full))
+            .OrderByDescending(x => x.Timestamp)
+            .Select(x => x.Full)
+            .ToList();
+
+        return list;
+    }
+
+    // Public: rollback migrations to reach target. Returns number rolled back.
+    public async Task<int> RollbackToAsync(
+        (Type Type, string Timestamp, string Name)[] discoveredMigrations,
+        string targetMigration,
+        CancellationToken ct = default)
+    {
+        var applied = await GetAppliedMigrationsAsync(ct);
+        var toRollbackFullNames = GetMigrationsToRollback(discoveredMigrations, applied, targetMigration);
+
+        if (toRollbackFullNames.Count == 0)
+            return 0;
+
+        var map = discoveredMigrations.ToDictionary(
+            m => $"{m.Timestamp}_{m.Name}",
+            m => m.Type);
+
+        var rolledBack = 0;
+        foreach (var fullName in toRollbackFullNames)
+        {
+            if (!map.TryGetValue(fullName, out var type))
+                continue;
+
+            var migration = (Migration)(Activator.CreateInstance(type) ?? throw new InvalidOperationException());
+            var builder = new MigrationBuilder();
+            migration.Down(builder);
+
+            var sqlBatch = MigrationUtils.ConvertOperationsToSql(builder.Operations);
+            await ExecuteSqlAsync(sqlBatch, ct);
+
+            await RemoveMigration(fullName);
+            rolledBack++;
+        }
+
+        return rolledBack;
+    }
+
+    // internal helper: executes provided migration wrappers (assumes wrapper.Name is the stored full name)
+    private async Task RunMigrations(params MigrationTypeWrapper[] migrationTypes)
     {
         foreach (var migrationType in migrationTypes)
         {
-            // if (await IsMigrationApplied(migrationType.Name)) continue;
-
             var migration =
                 (Migration)(Activator.CreateInstance(migrationType.Type) ?? throw new InvalidOperationException());
             var builder = new MigrationBuilder();
             migration.Up(builder);
 
-            // Convert operations to SQL and execute
             var sqlBatch = MigrationUtils.ConvertOperationsToSql(builder.Operations);
             await ExecuteSqlAsync(sqlBatch);
 
@@ -44,56 +172,34 @@ public class MigrationRunner
         }
     }
 
-    public async Task RollbackLastMigration()
-    {
-        var lastMigration = await GetLastAppliedMigration();
-        if (lastMigration != null)
-        {
-            var migrationType = Type.GetType($"Apolon.Migrations.{lastMigration}");
-            if (migrationType != null)
-            {
-                var builder = new MigrationBuilder();
-                var migration =
-                    (Migration)(Activator.CreateInstance(migrationType) ?? throw new InvalidOperationException());
-                migration.Down(builder);
-                await RemoveMigration(lastMigration);
-            }
-        }
-    }
-
-    public async Task<IReadOnlyList<string>> SyncSchemaAsync(
-        CancellationToken ct = default,
-        params Type[] entityTypes)
-    {
-        // 1) snapshots
-        var dbSnapshot = await SnapshotReader.ReadAsync(_connection, ct);
-        var modelSnapshot = ModelSnapshotBuilder.BuildFromModel(entityTypes);
-
-        // 2) diff -> ops
-        var ops = SchemaDiffer.Diff(modelSnapshot, dbSnapshot);
-
-        // 3) ops -> sql batch (operations are automatically sorted by dependency order)
-        var sqlBatch = MigrationUtils.ConvertOperationsToSql(ops);
-
-        // 4) apply in one transaction
-        if (sqlBatch.Count == 0)
-            return sqlBatch;
-
-        await _connection.BeginTransactionAsync(ct);
-        try
-        {
-            foreach (var sql in sqlBatch)
-                await _connection.ExecuteNonQueryAsync(_connection.CreateCommand(sql));
-
-            await _connection.CommitTransactionAsync(ct);
-            return sqlBatch;
-        }
-        catch
-        {
-            await _connection.RollbackTransactionAsync(ct);
-            throw;
-        }
-    }
+    // public async Task<IReadOnlyList<string>> SyncSchemaAsync(
+    //     CancellationToken ct = default,
+    //     params Type[] entityTypes)
+    // {
+    //     var dbSnapshot = await SnapshotReader.ReadAsync(_connection, ct);
+    //     var modelSnapshot = SnapshotBuilder.BuildFromModel(entityTypes);
+    //
+    //     var ops = SchemaDiffer.Diff(modelSnapshot, dbSnapshot);
+    //     var sqlBatch = MigrationUtils.ConvertOperationsToSql(ops);
+    //
+    //     if (sqlBatch.Count == 0)
+    //         return sqlBatch;
+    //
+    //     await _connection.BeginTransactionAsync(ct);
+    //     try
+    //     {
+    //         foreach (var sql in sqlBatch)
+    //             await _connection.ExecuteNonQueryAsync(_connection.CreateCommand(sql));
+    //
+    //         await _connection.CommitTransactionAsync(ct);
+    //         return sqlBatch;
+    //     }
+    //     catch
+    //     {
+    //         await _connection.RollbackTransactionAsync(ct);
+    //         throw;
+    //     }
+    // }
 
     private async Task ExecuteSqlAsync(List<string> sqlBatch, CancellationToken ct = default)
     {
@@ -117,11 +223,11 @@ public class MigrationRunner
 
     private async Task EnsureMigrationHistoryTable()
     {
-        List<string> sql =
-        [
+        var sql = new List<string>
+        {
             MigrationBuilderSql.BuildCreateSchema("apolon"),
             MigrationBuilderSql.BuildCreateTable(typeof(MigrationHistoryTable))
-        ];
+        };
 
         await ExecuteSqlAsync(sql);
     }
@@ -131,13 +237,9 @@ public class MigrationRunner
         var qb = new QueryBuilder<MigrationHistoryTable>()
             .Where(m => m.MigrationName == migrationName);
 
-        var command = _connection.CreateCommand(qb.Build());
-        foreach (var param in qb.GetParameters())
-        {
-            _connection.AddParameter(command, param.Name, param.Value);
-        }
+        var result = await _executor.QueryAsync(qb);
 
-        return await _connection.ExecuteScalarAsync(command) != null;
+        return result.Count != 0;
     }
 
     private async Task RecordMigration(string migrationName, string? productVersion = null)
@@ -148,7 +250,13 @@ public class MigrationRunner
 
     private async Task RemoveMigration(string migrationName)
     {
-        await _executor.DeleteAsync(new MigrationHistoryTable { MigrationName = migrationName });
+        var qb = new QueryBuilder<MigrationHistoryTable>().Where(m => m.MigrationName == migrationName);
+        var result = await _executor.QueryAsync(qb);
+
+        if (result.Count == 0)
+            return;
+
+        await _executor.DeleteAsync(result[0]);
     }
 
     private async Task<string?> GetLastAppliedMigration()
@@ -157,6 +265,8 @@ public class MigrationRunner
             .OrderByDescending(m => m.AppliedAt)
             .Take(1);
 
-        return (await _connection.ExecuteScalarAsync(_connection.CreateCommand(qb.Build())))?.ToString();
+        var result = await _executor.QueryAsync(qb);
+
+        return result.FirstOrDefault()?.MigrationName;
     }
 }

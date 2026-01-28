@@ -89,7 +89,7 @@ public class QueryBuilder<T> where T : class
         {
             BinaryExpression binExpr => TranslateBinaryExpression(binExpr),
             MethodCallExpression methodExpr => TranslateMethodCall(methodExpr),
-            MemberExpression memberExpr => GetColumnName(memberExpr.Member.Name),
+            MemberExpression memberExpr => TranslateMemberExpression(memberExpr),
             ConstantExpression constExpr => AddParameter(constExpr.Value ?? DBNull.Value),
             _ => throw new OrmException($"Unsupported expression: {expr.GetType()}")
         };
@@ -126,6 +126,24 @@ public class QueryBuilder<T> where T : class
         }
 
         throw new OrmException($"Unsupported method: {expr.Method.Name}");
+    }
+    
+    private string TranslateMemberExpression(MemberExpression expr)
+    {
+        // Check if this is accessing a parameter property
+        if (expr.Expression is ParameterExpression)
+        {
+            return GetColumnName(expr.Member.Name);
+        }
+    
+        // Otherwise, it's a captured variable (e.g., migrationName from closure)
+        // Evaluate it to get the actual value
+        var objectMember = Expression.Convert(expr, typeof(object));
+        var getterLambda = Expression.Lambda<Func<object>>(objectMember);
+        var getter = getterLambda.Compile();
+        var value = getter();
+    
+        return AddParameter(value ?? DBNull.Value);
     }
 
     private string GetColumnName(string propertyName)

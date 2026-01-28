@@ -13,7 +13,7 @@ internal static class SchemaDiffer
         var expectedTables = expected.Tables.ToDictionary(t => (t.Schema, Table: t.Name));
 
         // Remove migration history table from actual tables
-        var migrationSnapshotTable = ModelSnapshotBuilder.BuildFromModel(typeof(MigrationHistoryTable)).Tables[0];
+        var migrationSnapshotTable = SnapshotBuilder.BuildFromModel(typeof(MigrationHistoryTable)).Tables[0];
         actualTables.Remove((migrationSnapshotTable.Schema, migrationSnapshotTable.Name));
 
         // 1) Create schemas / tables that are missing

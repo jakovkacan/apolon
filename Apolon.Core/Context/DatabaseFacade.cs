@@ -71,31 +71,31 @@ public class DatabaseFacade
     public void CommitTransaction() => _connection.CommitTransaction();
     public void RollbackTransaction() => _connection.RollbackTransaction();
     
-    public static string DumpModelSql(Type[] modelTypes)
-    {
-        StringBuilder sb = new();
+    // public static string DumpModelSql(Type[] modelTypes)
+    // {
+    //     StringBuilder sb = new();
+    //
+    //     foreach (var modelType in modelTypes)
+    //     {
+    //         sb.Append(MigrationBuilderSql.BuildCreateTable(modelType));
+    //     }
+    //     
+    //     return sb.ToString();
+    // }
 
-        foreach (var modelType in modelTypes)
-        {
-            sb.Append(MigrationBuilderSql.BuildCreateTable(modelType));
-        }
-        
-        return sb.ToString();
-    }
-
-    public static SchemaSnapshot DumpModelSchema(Type[] modelTypes)
-    {
-        var modelSnapshot = ModelSnapshotBuilder.BuildFromModel(modelTypes);
-        
-        return modelSnapshot;
-    }
-
-    public async Task<SchemaSnapshot> DumpDbSchema()
-    {
-        var schemaSnapshot = await SnapshotReader.ReadAsync(_connection);
-
-        return schemaSnapshot;
-    }
+    // public static SchemaSnapshot DumpModelSchema(Type[] modelTypes)
+    // {
+    //     var modelSnapshot = SnapshotBuilder.BuildFromModel(modelTypes);
+    //     
+    //     return modelSnapshot;
+    // }
+    //
+    // public async Task<SchemaSnapshot> DumpDbSchema()
+    // {
+    //     var schemaSnapshot = await SnapshotReader.ReadAsync(_connection);
+    //
+    //     return schemaSnapshot;
+    // }
     
     // public static IReadOnlyList<MigrationOperation> DiffSchema(SchemaSnapshot expected, SchemaSnapshot actual)
     // {
@@ -103,8 +103,8 @@ public class DatabaseFacade
     //     return ops;
     // }
     
-    public Task<IReadOnlyList<string>> SyncSchemaAsync(params Type[] entityTypes)
-    {
-        return _migrationRunner.SyncSchemaAsync(entityTypes: entityTypes);
-    }
+    // public Task<IReadOnlyList<string>> SyncSchemaAsync(params Type[] entityTypes)
+    // {
+    //     return _migrationRunner.SyncSchemaAsync(entityTypes: entityTypes);
+    // }
 }

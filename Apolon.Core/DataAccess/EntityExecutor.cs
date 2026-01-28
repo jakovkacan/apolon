@@ -19,7 +19,7 @@ internal class EntityExecutor(IDbConnection connection)
 
         return connection.ExecuteNonQuery(command);
     }
-    
+
     public Task<int> InsertAsync<T>(T entity) where T : class
     {
         var builder = new CommandBuilder<T>();
@@ -45,7 +45,7 @@ internal class EntityExecutor(IDbConnection connection)
 
         return connection.ExecuteNonQuery(command);
     }
-    
+
     public Task<int> UpdateAsync<T>(T entity) where T : class
     {
         var builder = new CommandBuilder<T>();
@@ -70,7 +70,7 @@ internal class EntityExecutor(IDbConnection connection)
 
         return connection.ExecuteNonQuery(command);
     }
-    
+
     public Task<int> DeleteAsync<T>(T entity) where T : class
     {
         var builder = new CommandBuilder<T>();
@@ -84,12 +84,7 @@ internal class EntityExecutor(IDbConnection connection)
 
     public List<T> Query<T>(QueryBuilder<T> qb) where T : class
     {
-        var sql = qb.Build();
-        var command = connection.CreateCommand(sql);
-        foreach (var param in qb.GetParameters())
-        {
-            connection.AddParameter(command, param.Name, param.Value);
-        }
+        var command = connection.CreateCommandWithParameters(qb.Build(), qb.GetParameters());
 
         var result = new List<T>();
         try
@@ -105,21 +100,16 @@ internal class EntityExecutor(IDbConnection connection)
         catch (DbException ex)
         {
             throw new DataAccessException(
-                $"Query failed for entity '{typeof(T).Name}'. Check that the database schema is in sync with the model. SQL: {sql}",
+                $"Query failed for entity '{typeof(T).Name}'. Check that the database schema is in sync with the model.",
                 ex);
         }
 
         return result;
     }
-    
+
     public async Task<List<T>> QueryAsync<T>(QueryBuilder<T> qb) where T : class
     {
-        var sql = qb.Build();
-        var command = connection.CreateCommand(sql);
-        foreach (var param in qb.GetParameters())
-        {
-            connection.AddParameter(command, param.Name, param.Value);
-        }
+        var command = connection.CreateCommandWithParameters(qb.Build(), qb.GetParameters());
 
         var result = new List<T>();
         try
@@ -135,7 +125,7 @@ internal class EntityExecutor(IDbConnection connection)
         catch (DbException ex)
         {
             throw new DataAccessException(
-                $"Query failed for entity '{typeof(T).Name}'. Check that the database schema is in sync with the model. SQL: {sql}",
+                $"Query failed for entity '{typeof(T).Name}'. Check that the database schema is in sync with the model.",
                 ex);
         }
 

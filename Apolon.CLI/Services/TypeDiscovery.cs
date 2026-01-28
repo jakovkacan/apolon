@@ -7,7 +7,8 @@ namespace Apolon.CLI.Services;
 
 internal static class TypeDiscovery
 {
-    public static Type[] DiscoverEntityTypes(string path, bool hasTableAttribute = false)
+    public static async Task<Type[]> DiscoverEntityTypes(string path, bool hasTableAttribute = false,
+        bool rebuildProject = true)
     {
         // Always try to find and build the project first to ensure latest state
         string? projectPath = null;
@@ -30,7 +31,10 @@ internal static class TypeDiscovery
         // If we found a project file, always rebuild it
         if (projectPath != null)
         {
-            return BuildAndLoadTypes(projectPath, hasTableAttribute);
+            if (!rebuildProject) return LoadTypes(projectPath, hasTableAttribute);
+
+            await BuildTypes(projectPath);
+            return LoadTypes(projectPath, hasTableAttribute);
         }
 
         // Fallback: no project file found, load from existing assemblies
@@ -67,7 +71,7 @@ internal static class TypeDiscovery
         return null;
     }
 
-    private static Type[] BuildAndLoadTypes(string projectFile, bool hasTableAttribute)
+    private static async Task BuildTypes(string projectFile)
     {
         Console.WriteLine($"Rebuilding project to ensure latest state: {projectFile}");
 
@@ -82,16 +86,22 @@ internal static class TypeDiscovery
             CreateNoWindow = true
         });
 
-        buildProcess?.WaitForExit();
+        if (buildProcess is null)
+            throw new InvalidOperationException($"Failed to start dotnet process: {projectFile}");
+
+        await buildProcess.WaitForExitAsync();
 
         if (buildProcess is not { ExitCode: 0 })
         {
-            var error = buildProcess!.StandardError.ReadToEnd();
+            var error = await buildProcess.StandardError.ReadToEndAsync();
             throw new InvalidOperationException($"Failed to build project: {projectFile}\n{error}");
         }
 
         Console.WriteLine("Build successful. Loading types from compiled assembly...");
+    }
 
+    private static Type[] LoadTypes(string projectFile, bool hasTableAttribute)
+    {
         // Find the output assembly
         var projectDir = Path.GetDirectoryName(projectFile)!;
         var assemblyFiles = Directory.GetFiles(projectDir, "*.dll", SearchOption.AllDirectories)
@@ -172,7 +182,8 @@ internal static class TypeDiscovery
             : entityTypes.ToArray();
     }
 
-    internal static (Type Type, string Timestamp, string Name)[] DiscoverMigrationTypes(string migrationsPath)
+    internal static async Task<(Type Type, string Timestamp, string Name)[]> DiscoverMigrationTypes(
+        string migrationsPath, bool rebuildProject = true)
     {
         var fullPath = Path.GetFullPath(migrationsPath);
 
@@ -191,9 +202,7 @@ internal static class TypeDiscovery
         if (csFiles.Length > 0)
         {
             // Build the project to get types
-            var types = DiscoverEntityTypes(fullPath);
-
-            Console.WriteLine($"Found {types.Length} type(s) in source files.");
+            var types = await DiscoverEntityTypes(fullPath, rebuildProject: rebuildProject);
 
             // Create a mapping of class names to their source files
             var fileNameToTimestamp = csFiles
@@ -206,8 +215,6 @@ internal static class TypeDiscovery
                 .ToDictionary(
                     x => x.FileName[15..], // Class name after timestamp
                     x => x.FileName[..14]); // Timestamp
-
-            Console.WriteLine($"Found {fileNameToTimestamp.Count} migration(s) in source files.");
 
             // Filter for Migration types and extract timestamp/name from filename
             return types
@@ -271,9 +278,9 @@ internal static class TypeDiscovery
         }
 
         // Try format with leading underscore: _YYYYMMDDHHMMSS_MigrationName
-        if (className.StartsWith("_"))
+        if (className.StartsWith('_'))
         {
-            parts = className.Substring(1).Split('_', 2);
+            parts = className[1..].Split('_', 2);
             if (parts is [{ Length: 14 }, _] && long.TryParse(parts[0], out _))
             {
                 return (type, parts[0], parts[1]);

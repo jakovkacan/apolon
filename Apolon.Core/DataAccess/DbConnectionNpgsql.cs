@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Data.Common;
 using Apolon.Core.Exceptions;
+using Apolon.Core.Sql;
 using Npgsql;
 
 namespace Apolon.Core.DataAccess;
@@ -66,6 +67,17 @@ internal class DbConnectionNpgsql(string connectionString) : IDbConnection, IAsy
         // For non-enumerables, let Npgsql infer the type naturally from parameter.Value
 
         command.Parameters.Add(parameter);
+    }
+
+    public DbCommand CreateCommandWithParameters(string sql, List<ParameterMapping> parameters)
+    {
+        var command = CreateCommand(sql);
+        foreach (var param in parameters)
+        {
+            AddParameter(command, param.Name, param.Value);
+        }
+            
+        return command;
     }
     
     private static NpgsqlTypes.NpgsqlDbType GetNpgsqlDbType(object value)

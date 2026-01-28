@@ -1,4 +1,5 @@
 ﻿using System.Data.Common;
+using Apolon.Core.Sql;
 
 namespace Apolon.Core.DataAccess;
 
@@ -16,6 +17,7 @@ public interface IDbConnection : IDisposable
 
     public DbCommand CreateCommand(string sql);
     public void AddParameter(DbCommand command, string name, object value);
+    public DbCommand CreateCommandWithParameters(string sql, List<ParameterMapping> parameters);
 
     public DbDataReader ExecuteReader(DbCommand command);
     public Task<DbDataReader> ExecuteReaderAsync(DbCommand command);

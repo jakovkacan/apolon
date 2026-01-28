@@ -197,11 +197,7 @@ public class DbSet<T> : IEnumerable<T>
 
         qb.WhereRaw($"{foreignKeyColumn.ColumnName} = ANY({{0}})", entityIds.ToArray());
 
-        var command = _connection.CreateCommand(qb.Build());
-        foreach (var param in qb.GetParameters())
-        {
-            _connection.AddParameter(command, param.Name, param.Value);
-        }
+        var command = _connection.CreateCommandWithParameters(qb.Build(), qb.GetParameters());
 
         var relatedEntities = new Dictionary<object, List<object>>();
 
@@ -262,11 +258,7 @@ public class DbSet<T> : IEnumerable<T>
 
         qb.WhereRaw($"{relatedMetadata.PrimaryKey.ColumnName} = ANY({{0}})", relatedIds.ToArray());
 
-        DbCommand command = _connection.CreateCommand(qb.Build());
-        foreach (ParameterMapping param in qb.GetParameters())
-        {
-            _connection.AddParameter(command, param.Name, param.Value);
-        }
+        DbCommand command = _connection.CreateCommandWithParameters(qb.Build(), qb.GetParameters());
 
         var relatedEntities = new Dictionary<object, object>();
 
