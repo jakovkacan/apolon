@@ -25,7 +25,7 @@ public class MigrationRunner
         return runner;
     }
 
-    internal async Task RunPendingMigrations(params MigrationTypeWrapper[] migrationTypes)
+    internal async Task RunMigrations(params MigrationTypeWrapper[] migrationTypes)
     {
         foreach (var migrationType in migrationTypes)
         {
@@ -72,70 +72,8 @@ public class MigrationRunner
         // 2) diff -> ops
         var ops = SchemaDiffer.Diff(modelSnapshot, dbSnapshot);
 
-        // 3) ops -> sql batch
-        var sqlBatch = new List<string>();
-
-        // Create schema/table ops first
-        foreach (var op in ops.Where(o => o.Type is MigrationOperationType.CreateSchema))
-            sqlBatch.Add(MigrationBuilderSql.BuildCreateSchema(op.Schema));
-
-        foreach (var op in ops.Where(o => o.Type is MigrationOperationType.CreateTable))
-            sqlBatch.Add(MigrationBuilderSql.BuildCreateTableFromName(op.Schema, op.Table));
-
-        // Column changes
-        foreach (var op in ops.Where(o => o.Type is MigrationOperationType.AddColumn))
-            sqlBatch.Add(MigrationBuilderSql.BuildAddColumn(
-                op.Schema,
-                op.Table,
-                op.Column!,
-                op.GetSqlType()!,
-                op.IsNullable!.Value,
-                op.DefaultSql,
-                op.IsPrimaryKey ?? false,
-                op.IsIdentity ?? false,
-                op.IdentityGeneration));
-
-        foreach (var op in ops.Where(o => o.Type is MigrationOperationType.AlterColumnType))
-            sqlBatch.Add(MigrationBuilderSql.BuildAlterColumnType(op.Schema, op.Table, op.Column!, op.GetSqlType()!));
-
-        foreach (var op in ops.Where(o => o.Type is MigrationOperationType.AlterNullability))
-            sqlBatch.Add(
-                MigrationBuilderSql.BuildAlterNullability(op.Schema, op.Table, op.Column!, op.IsNullable!.Value));
-
-        foreach (var op in ops.Where(o => o.Type is MigrationOperationType.SetDefault))
-            sqlBatch.Add(MigrationBuilderSql.BuildSetDefault(op.Schema, op.Table, op.Column!, op.DefaultSql!));
-
-        foreach (var op in ops.Where(o => o.Type is MigrationOperationType.DropDefault))
-            sqlBatch.Add(MigrationBuilderSql.BuildDropDefault(op.Schema, op.Table, op.Column!));
-
-        foreach (var op in ops.Where(o => o.Type is MigrationOperationType.DropConstraint))
-            sqlBatch.Add(MigrationBuilderSql.BuildDropConstraint(op.Schema, op.Table, op.ConstraintName!));
-
-        foreach (var op in ops.Where(o => o.Type is MigrationOperationType.DropColumn))
-            sqlBatch.Add(MigrationBuilderSql.BuildDropColumn(op.Schema, op.Table, op.Column!));
-
-        foreach (var op in ops.Where(o => o.Type is MigrationOperationType.DropTable))
-            sqlBatch.Add(MigrationBuilderSql.BuildDropTableFromName(op.Schema, op.Table));
-
-        // Constraints last (safer)
-        foreach (var op in ops.Where(o => o.Type is MigrationOperationType.AddUnique))
-            sqlBatch.Add(MigrationBuilderSql.BuildAddUnique(op.Schema, op.Table, op.Column!));
-
-        // FK add: if you want model-driven OnDelete behavior, extend MigrationOp to carry it.
-        foreach (var op in ops.Where(o => o.Type is MigrationOperationType.AddForeignKey))
-        {
-            // Default ON DELETE NO ACTION unless you pass richer info in the op.
-            sqlBatch.Add(MigrationBuilderSql.BuildAddForeignKey(
-                schema: op.Schema,
-                table: op.Table,
-                column: op.Column!,
-                constraintName: op.ConstraintName ?? $"{op.Table}_{op.Column}_fkey",
-                refSchema: op.RefSchema ?? "public",
-                refTable: op.RefTable ?? throw new InvalidOperationException("Missing ref table"),
-                refColumn: op.RefColumn ?? "id",
-                onDelete: MigrationUtils.ParseOnDeleteRule(op.OnDeleteRule)
-            ));
-        }
+        // 3) ops -> sql batch (operations are automatically sorted by dependency order)
+        var sqlBatch = MigrationUtils.ConvertOperationsToSql(ops);
 
         // 4) apply in one transaction
         if (sqlBatch.Count == 0)

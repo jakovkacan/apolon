@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Apolon.Core.Attributes;
+using Apolon.Core.Migrations.Models;
 
 namespace Apolon.CLI.Services;
 
@@ -169,5 +170,117 @@ internal static class TypeDiscovery
         return entityTypes.Count == 0
             ? throw new InvalidOperationException($"No entity types found in: {directoryPath}")
             : entityTypes.ToArray();
+    }
+
+    internal static (Type Type, string Timestamp, string Name)[] DiscoverMigrationTypes(string migrationsPath)
+    {
+        var fullPath = Path.GetFullPath(migrationsPath);
+
+        // Check if directory exists
+        if (!Directory.Exists(fullPath))
+        {
+            Console.WriteLine($"Migrations directory not found: {fullPath}");
+            return [];
+        }
+
+        // Check for .cs files (auto-build if needed)
+        var csFiles = Directory.GetFiles(fullPath, "*.cs", SearchOption.TopDirectoryOnly)
+            .Where(f => !f.EndsWith(".Designer.cs") && !f.EndsWith(".g.cs"))
+            .ToArray();
+
+        if (csFiles.Length > 0)
+        {
+            // Build the project to get types
+            var types = DiscoverEntityTypes(fullPath);
+
+            Console.WriteLine($"Found {types.Length} type(s) in source files.");
+
+            // Create a mapping of class names to their source files
+            var fileNameToTimestamp = csFiles
+                .Select(f => new
+                {
+                    FileName = Path.GetFileNameWithoutExtension(f),
+                    FilePath = f
+                })
+                .Where(x => x.FileName.Length > 15 && x.FileName[14] == '_') // YYYYMMDDHHMMSS_
+                .ToDictionary(
+                    x => x.FileName[15..], // Class name after timestamp
+                    x => x.FileName[..14]); // Timestamp
+
+            Console.WriteLine($"Found {fileNameToTimestamp.Count} migration(s) in source files.");
+
+            // Filter for Migration types and extract timestamp/name from filename
+            return types
+                .Where(t => typeof(Migration).IsAssignableFrom(t))
+                .Select(t => ParseMigrationNameFromType(t, fileNameToTimestamp))
+                .Where(m => m.Type != null)
+                .OrderBy(m => m.Timestamp)
+                .ToArray();
+        }
+
+        // Try to load from compiled assemblies in the directory
+        var dllFiles = Directory.GetFiles(fullPath, "*.dll", SearchOption.AllDirectories);
+        var migrationTypes = new List<(Type Type, string Timestamp, string Name)>();
+
+        foreach (var dllFile in dllFiles)
+        {
+            try
+            {
+                var assembly = Assembly.LoadFrom(dllFile);
+                var types = assembly.GetTypes()
+                    .Where(t => typeof(Migration).IsAssignableFrom(t) && !t.IsAbstract)
+                    .Select(ParseMigrationNameFromClassName)
+                    .Where(m => m.Type != null);
+
+                migrationTypes.AddRange(types);
+            }
+            catch
+            {
+                // Ignore assemblies that can't be loaded
+            }
+        }
+
+        return migrationTypes.OrderBy(m => m.Timestamp).ToArray();
+    }
+
+    private static (Type Type, string Timestamp, string Name) ParseMigrationNameFromType(
+        Type type,
+        Dictionary<string, string> classNameToTimestamp)
+    {
+        var className = type.Name;
+
+        // Try to find timestamp from filename mapping
+        if (classNameToTimestamp.TryGetValue(className, out var timestamp))
+        {
+            return (type, timestamp, className);
+        }
+
+        // Fallback: class name might have timestamp (old format)
+        return ParseMigrationNameFromClassName(type);
+    }
+
+    private static (Type Type, string Timestamp, string Name) ParseMigrationNameFromClassName(Type type)
+    {
+        var className = type.Name;
+
+        // Try format: YYYYMMDDHHMMSS_MigrationName (shouldn't happen with C# classes)
+        var parts = className.Split('_', 2);
+        if (parts is [{ Length: 14 }, _] && long.TryParse(parts[0], out _))
+        {
+            return (type, parts[0], parts[1]);
+        }
+
+        // Try format with leading underscore: _YYYYMMDDHHMMSS_MigrationName
+        if (className.StartsWith("_"))
+        {
+            parts = className.Substring(1).Split('_', 2);
+            if (parts is [{ Length: 14 }, _] && long.TryParse(parts[0], out _))
+            {
+                return (type, parts[0], parts[1]);
+            }
+        }
+
+        // Fallback: no timestamp found, use zeros
+        return (type, "00000000000000", className);
     }
 }

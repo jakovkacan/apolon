@@ -113,18 +113,24 @@ internal static class MigrationCodeGenerator
         // Reverse operations in reverse order
         var reversedOps = operations.Reverse().ToList();
         var droppedTables = new HashSet<(string Schema, string Table)>();
+        reversedOps.Where(op => op.Type == MigrationOperationType.CreateTable).ToList()
+            .ForEach(t => droppedTables.Add((t.Schema, t.Table)));
 
         foreach (var op in reversedOps)
         {
             switch (op.Type)
             {
+                // case MigrationOperationType.CreateSchema:
+                //     sb.AppendLine($"{indent}migrationBuilder.DropSchema(\"{op.Schema}\");");
+                //     break;
+
                 case MigrationOperationType.CreateTable:
-                    if (droppedTables.Add((op.Schema, op.Table)))
-                        sb.AppendLine($"{indent}migrationBuilder.DropTable(\"{op.Schema}\", \"{op.Table}\");");
+                    sb.AppendLine($"{indent}migrationBuilder.DropTable(\"{op.Schema}\", \"{op.Table}\");");
                     break;
 
                 case MigrationOperationType.DropTable:
-                    sb.AppendLine($"{indent}// TODO: Recreate table \"{op.Schema}.{op.Table}\" if needed");
+                    sb.AppendLine(
+                        $"{indent}// TODO: Recreate table \"{op.Schema}.{op.Table}\" - structure not available in forward migration");
                     break;
 
                 case MigrationOperationType.AddColumn:
@@ -135,13 +141,89 @@ internal static class MigrationCodeGenerator
                     break;
 
                 case MigrationOperationType.DropColumn:
-                    sb.AppendLine($"{indent}// TODO: Recreate column \"{op.Schema}.{op.Table}.{op.Column}\" if needed");
+                    if (!droppedTables.Contains((op.Schema, op.Table)))
+                    {
+                        // Try to recreate the column if we have enough information
+                        if (!string.IsNullOrWhiteSpace(op.GetSqlType()) && op.IsNullable.HasValue)
+                        {
+                            var reverseAddColumnCall = GenerateAddColumnCall(op);
+                            sb.AppendLine($"{indent}{reverseAddColumnCall}");
+                        }
+                        else
+                        {
+                            sb.AppendLine(
+                                $"{indent}// TODO: Recreate column \"{op.Schema}.{op.Table}.{op.Column}\" - column metadata not available");
+                        }
+                    }
+
                     break;
 
                 case MigrationOperationType.AlterColumnType:
+                    if (!droppedTables.Contains((op.Schema, op.Table)))
+                    {
+                        sb.AppendLine(
+                            $"{indent}// TODO: Revert column type for \"{op.Schema}.{op.Table}.{op.Column}\" - old type not available");
+                    }
+
+                    break;
+
                 case MigrationOperationType.AlterNullability:
-                    sb.AppendLine(
-                        $"{indent}// TODO: Revert column changes for \"{op.Schema}.{op.Table}.{op.Column}\" if needed");
+                    if (!droppedTables.Contains((op.Schema, op.Table)))
+                    {
+                        sb.AppendLine(
+                            $"{indent}// TODO: Revert nullability for \"{op.Schema}.{op.Table}.{op.Column}\" - old nullability not available");
+                    }
+
+                    break;
+
+                case MigrationOperationType.SetDefault:
+                    if (!droppedTables.Contains((op.Schema, op.Table)))
+                    {
+                        sb.AppendLine(
+                            $"{indent}migrationBuilder.DropDefault(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\");");
+                    }
+
+                    break;
+
+                case MigrationOperationType.DropDefault:
+                    if (!droppedTables.Contains((op.Schema, op.Table)) && !string.IsNullOrWhiteSpace(op.DefaultSql))
+                    {
+                        sb.AppendLine(
+                            $"{indent}migrationBuilder.SetDefault(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\", \"{EscapeString(op.DefaultSql)}\");");
+                    }
+                    else if (!droppedTables.Contains((op.Schema, op.Table)))
+                    {
+                        sb.AppendLine(
+                            $"{indent}// TODO: Restore default for \"{op.Schema}.{op.Table}.{op.Column}\" - default value not available");
+                    }
+
+                    break;
+
+                case MigrationOperationType.AddUnique:
+                    if (!droppedTables.Contains((op.Schema, op.Table)) && !string.IsNullOrWhiteSpace(op.ConstraintName))
+                    {
+                        sb.AppendLine(
+                            $"{indent}migrationBuilder.DropConstraint(\"{op.Schema}\", \"{op.Table}\", \"{op.ConstraintName}\");");
+                    }
+
+                    break;
+
+                case MigrationOperationType.AddForeignKey:
+                    if (!droppedTables.Contains((op.Schema, op.Table)) && !string.IsNullOrWhiteSpace(op.ConstraintName))
+                    {
+                        sb.AppendLine(
+                            $"{indent}migrationBuilder.DropConstraint(\"{op.Schema}\", \"{op.Table}\", \"{op.ConstraintName}\");");
+                    }
+
+                    break;
+
+                case MigrationOperationType.DropConstraint:
+                    if (!droppedTables.Contains((op.Schema, op.Table)))
+                    {
+                        sb.AppendLine(
+                            $"{indent}// TODO: Recreate constraint \"{op.ConstraintName}\" on \"{op.Schema}.{op.Table}\" - constraint definition not available");
+                    }
+
                     break;
             }
         }

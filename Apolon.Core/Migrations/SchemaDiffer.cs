@@ -5,7 +5,7 @@ namespace Apolon.Core.Migrations;
 internal static class SchemaDiffer
 {
     public static IReadOnlyList<MigrationOperation> Diff(SchemaSnapshot expected, SchemaSnapshot actual,
-        MigrationOperation[]? commitedOperations = null)
+        IReadOnlyList<MigrationOperation>? commitedOperations = null)
     {
         var ops = new List<MigrationOperation>();
 

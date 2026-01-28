@@ -48,9 +48,8 @@ internal static class DatabaseRollbackCommand
                 Console.WriteLine($"Migrations: {migrationsPath}");
                 Console.WriteLine($"Target: {targetMigration}");
                 Console.WriteLine();
-
-                var executor = new MigrationExecutor();
-                await executor.RollbackMigrationsAsync(
+                
+                await MigrationExecutor.RollbackMigrationsAsync(
                     connectionString,
                     migrationsPath,
                     targetMigration);

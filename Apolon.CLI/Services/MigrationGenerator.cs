@@ -1,6 +1,7 @@
 using Apolon.Core.DataAccess;
 using Apolon.Core.Migrations;
 using Apolon.Core.Migrations.Models;
+using Apolon.Core.Migrations.Utils;
 
 namespace Apolon.CLI.Services;
 
@@ -26,8 +27,17 @@ internal static class MigrationGenerator
         Console.WriteLine("Fetching database snapshot...");
         var dbSnapshot = await FetchDatabaseSnapshotAsync(connectionString);
 
+        Console.WriteLine("Fetching commited migrations...");
+        var migrationTypes = TypeDiscovery.DiscoverMigrationTypes(migrationsPath);
+        var committedMigrations = migrationTypes
+            .Select(mt => mt.Type)
+            .ToList();
+
+        Console.WriteLine("Fetching commited operations...");
+        var committedOperations = MigrationUtils.ExtractOperationsFromMigrationTypes(committedMigrations);
+
         Console.WriteLine("Comparing snapshots...");
-        var operations = SchemaDiffer.Diff(modelSnapshot, dbSnapshot);
+        var operations = SchemaDiffer.Diff(modelSnapshot, dbSnapshot, committedOperations);
         Console.WriteLine($"Found {operations.Count} migration operations");
 
         if (operations.Count == 0)
@@ -37,15 +47,16 @@ internal static class MigrationGenerator
         }
 
         // Display operations
-        Console.WriteLine("\nOperations to be generated:");
-        foreach (var op in operations)
-        {
-            Console.WriteLine($"  - {op.Type}: {op.Schema}.{op.Table}" +
-                              (op.Column != null ? $".{op.Column}" : ""));
-        }
+        // Console.WriteLine("\nOperations to be generated:");
+        // foreach (var op in operations)
+        // {
+        //     Console.WriteLine($"  - {op.Type}: {op.Schema}.{op.Table}" +
+        //                       (op.Column != null ? $".{op.Column}" : ""));
+        // }
 
         Console.WriteLine($"\nGenerating migration file: {sanitizedName}");
-        var migrationCode = MigrationCodeGenerator.GenerateMigrationCode(sanitizedName, operations, namespaceName);
+        var migrationCode =
+            FluentMigrationCodeGenerator.GenerateMigrationCode(sanitizedName, operations, namespaceName, committedOperations);
 
         var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
         var fileName = $"{timestamp}_{sanitizedName}.cs";
