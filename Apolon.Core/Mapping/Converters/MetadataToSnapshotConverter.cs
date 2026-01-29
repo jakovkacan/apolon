@@ -29,7 +29,7 @@ internal static class MetadataToSnapshotConverter
     /// <summary>
     /// Converts a property metadata object to a column snapshot.
     /// </summary>
-    public static ColumnSnapshot ToColumnSnapshot(PropertyMetadata prop, EntityMetadata entityContext)
+    internal static ColumnSnapshot ToColumnSnapshot(PropertyMetadata prop, EntityMetadata entityContext)
     {
         var colName = SnapshotNormalization.NormalizeIdentifier(prop.ColumnName);
 
