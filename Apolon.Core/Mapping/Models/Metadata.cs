@@ -1,5 +1,7 @@
 ﻿using System.Reflection;
 using Apolon.Core.Attributes;
+using Apolon.Core.Mapping.Converters;
+using Apolon.Core.Migrations.Models;
 
 namespace Apolon.Core.Mapping.Models;
 
@@ -12,6 +14,11 @@ internal class EntityMetadata
     public required PrimaryKeyMetadata PrimaryKey { get; init; }
     public required IReadOnlyList<ForeignKeyMetadata> ForeignKeys { get; init; }
     public required IReadOnlyList<RelationshipMetadata> Relationships { get; set; }
+
+    /// <summary>
+    /// Converts this entity metadata to a normalized schema snapshot for migration diffing.
+    /// </summary>
+    public TableSnapshot ToSnapshot() => MetadataToSnapshotConverter.ToSnapshot(this);
 }
 
 internal class PropertyMetadata
