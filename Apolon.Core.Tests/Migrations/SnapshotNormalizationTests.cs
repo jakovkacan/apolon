@@ -1,5 +1,4 @@
 using Apolon.Core.Migrations;
-using Xunit;
 
 namespace Apolon.Core.Tests.Migrations;
 

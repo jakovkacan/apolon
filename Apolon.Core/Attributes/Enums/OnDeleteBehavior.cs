@@ -11,14 +11,17 @@ public enum OnDeleteBehavior
 
 public static class OnDeleteBehaviorExtensions
 {
-    public static string ToSql(this OnDeleteBehavior behavior) => behavior switch
+    public static string ToSql(this OnDeleteBehavior behavior)
     {
-        OnDeleteBehavior.Cascade => "CASCADE",
-        OnDeleteBehavior.Restrict => "RESTRICT",
-        OnDeleteBehavior.SetNull => "SET NULL",
-        OnDeleteBehavior.SetDefault => "SET DEFAULT",
-        _ => "NO ACTION"
-    };
+        return behavior switch
+        {
+            OnDeleteBehavior.Cascade => "CASCADE",
+            OnDeleteBehavior.Restrict => "RESTRICT",
+            OnDeleteBehavior.SetNull => "SET NULL",
+            OnDeleteBehavior.SetDefault => "SET DEFAULT",
+            _ => "NO ACTION"
+        };
+    }
 
     public static bool TryParse(string? rule, out OnDeleteBehavior behavior)
     {
@@ -52,5 +55,7 @@ public static class OnDeleteBehaviorExtensions
     }
 
     public static OnDeleteBehavior ParseOrDefault(string? rule)
-        => TryParse(rule, out var result) ? result : OnDeleteBehavior.NoAction;
+    {
+        return TryParse(rule, out var result) ? result : OnDeleteBehavior.NoAction;
+    }
 }

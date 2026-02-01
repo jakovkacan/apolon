@@ -10,13 +10,17 @@ public class CheckupType
     [PrimaryKey(AutoIncrement = true)]
     public int Id { get; set; }
 
-    [Column("type_code", DbType = "VARCHAR(20)", IsUnique = true)]
+    [Required]
+    [Unique]
+    [Column("type_code", DbType = "VARCHAR(20)")]
     public required string TypeCode { get; set; }
 
     public string? Description { get; set; }
 
     // Seed data: GP, BLOOD, X-RAY, CT, MRI, ULTRA, EKG, ECHO, EYE, DERM, DENTA, MAMMO, EEG
 
-    public override string ToString() =>
-        $"{nameof(Id)}: {Id}, {nameof(TypeCode)}: {TypeCode}, {nameof(Description)}: {Description}";
+    public override string ToString()
+    {
+        return $"{nameof(Id)}: {Id}, {nameof(TypeCode)}: {TypeCode}, {nameof(Description)}: {Description}";
+    }
 }

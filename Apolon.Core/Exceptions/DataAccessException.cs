@@ -1,5 +1,3 @@
-using System;
-
 namespace Apolon.Core.Exceptions;
 
 public class DataAccessException : OrmException

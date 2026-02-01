@@ -1,7 +1,6 @@
 ﻿using Apolon.Core.Attributes;
 using Apolon.Core.Migrations;
 using Apolon.Core.Migrations.Models;
-using Xunit;
 
 namespace Apolon.Core.Tests.Migrations;
 
@@ -228,7 +227,7 @@ public class SnapshotBuilderTests
         var operations = new List<MigrationOperation>
         {
             new(MigrationOperationType.AddColumn, "public", "users",
-                Column: "name", SqlType: "varchar", IsNullable: false)
+                "name", "varchar", IsNullable: false)
         };
 
         var result = SnapshotBuilder.ApplyMigrations(initialSnapshot, operations);
@@ -250,7 +249,7 @@ public class SnapshotBuilderTests
         var operations = new List<MigrationOperation>
         {
             new(MigrationOperationType.AddColumn, "public", "users",
-                Column: "status", SqlType: "varchar", IsNullable: false, DefaultSql: "'active'")
+                "status", "varchar", IsNullable: false, DefaultSql: "'active'")
         };
 
         var result = SnapshotBuilder.ApplyMigrations(initialSnapshot, operations);
@@ -270,7 +269,7 @@ public class SnapshotBuilderTests
         var operations = new List<MigrationOperation>
         {
             new(MigrationOperationType.AddColumn, "public", "users",
-                Column: "id", SqlType: "int4", IsNullable: false,
+                "id", "int4", IsNullable: false,
                 IsPrimaryKey: true, IsIdentity: true, IdentityGeneration: "always")
         };
 
@@ -292,7 +291,7 @@ public class SnapshotBuilderTests
         var operations = new List<MigrationOperation>
         {
             new(MigrationOperationType.AddColumn, "public", "orders",
-                Column: "user_id", SqlType: "int4", IsNullable: false,
+                "user_id", "int4", IsNullable: false,
                 RefSchema: "public", RefTable: "users", RefColumn: "id", OnDeleteRule: "CASCADE")
         };
 
@@ -316,7 +315,7 @@ public class SnapshotBuilderTests
         ]);
         var operations = new List<MigrationOperation>
         {
-            new(MigrationOperationType.DropColumn, "public", "users", Column: "email")
+            new(MigrationOperationType.DropColumn, "public", "users", "email")
         };
 
         var result = SnapshotBuilder.ApplyMigrations(initialSnapshot, operations);
@@ -330,12 +329,12 @@ public class SnapshotBuilderTests
     public void ApplyMigrations_AlterColumnType_ChangesDataType()
     {
         var initialSnapshot = new SchemaSnapshot([
-            new TableSnapshot("public", "users", [Col("id"), Col("age", dataType: "int4")])
+            new TableSnapshot("public", "users", [Col("id"), Col("age", "int4")])
         ]);
         var operations = new List<MigrationOperation>
         {
             new(MigrationOperationType.AlterColumnType, "public", "users",
-                Column: "age", SqlType: "bigint")
+                "age", "bigint")
         };
 
         var result = SnapshotBuilder.ApplyMigrations(initialSnapshot, operations);
@@ -350,12 +349,12 @@ public class SnapshotBuilderTests
     public void ApplyMigrations_AlterColumnTypeWithPrecision_UpdatesTypeDetails()
     {
         var initialSnapshot = new SchemaSnapshot([
-            new TableSnapshot("public", "products", [Col("id"), Col("price", dataType: "numeric")])
+            new TableSnapshot("public", "products", [Col("id"), Col("price", "numeric")])
         ]);
         var operations = new List<MigrationOperation>
         {
             new(MigrationOperationType.AlterColumnType, "public", "products",
-                Column: "price", SqlType: "numeric", NumericPrecision: 10, NumericScale: 2)
+                "price", "numeric", NumericPrecision: 10, NumericScale: 2)
         };
 
         var result = SnapshotBuilder.ApplyMigrations(initialSnapshot, operations);
@@ -376,7 +375,7 @@ public class SnapshotBuilderTests
         var operations = new List<MigrationOperation>
         {
             new(MigrationOperationType.AlterNullability, "public", "users",
-                Column: "email", IsNullable: false)
+                "email", IsNullable: false)
         };
 
         var result = SnapshotBuilder.ApplyMigrations(initialSnapshot, operations);
@@ -396,7 +395,7 @@ public class SnapshotBuilderTests
         var operations = new List<MigrationOperation>
         {
             new(MigrationOperationType.SetDefault, "public", "users",
-                Column: "status", DefaultSql: "'pending'")
+                "status", DefaultSql: "'pending'")
         };
 
         var result = SnapshotBuilder.ApplyMigrations(initialSnapshot, operations);
@@ -415,7 +414,7 @@ public class SnapshotBuilderTests
         ]);
         var operations = new List<MigrationOperation>
         {
-            new(MigrationOperationType.DropDefault, "public", "users", Column: "status")
+            new(MigrationOperationType.DropDefault, "public", "users", "status")
         };
 
         var result = SnapshotBuilder.ApplyMigrations(initialSnapshot, operations);
@@ -435,7 +434,7 @@ public class SnapshotBuilderTests
         var operations = new List<MigrationOperation>
         {
             new(MigrationOperationType.AddUnique, "public", "users",
-                Column: "email", ConstraintName: "users_email_key")
+                "email", ConstraintName: "users_email_key")
         };
 
         var result = SnapshotBuilder.ApplyMigrations(initialSnapshot, operations);
@@ -508,7 +507,7 @@ public class SnapshotBuilderTests
         var operations = new List<MigrationOperation>
         {
             new(MigrationOperationType.AddForeignKey, "public", "orders",
-                Column: "user_id", ConstraintName: "fk_orders_user",
+                "user_id", ConstraintName: "fk_orders_user",
                 RefSchema: "public", RefTable: "users", RefColumn: "id", OnDeleteRule: "SET NULL")
         };
 
@@ -533,12 +532,12 @@ public class SnapshotBuilderTests
         {
             new(MigrationOperationType.CreateTable, "public", "users"),
             new(MigrationOperationType.AddColumn, "public", "users",
-                Column: "id", SqlType: "int4", IsNullable: false, IsPrimaryKey: true),
+                "id", "int4", IsNullable: false, IsPrimaryKey: true),
             new(MigrationOperationType.AddColumn, "public", "users",
-                Column: "name", SqlType: "varchar", IsNullable: false),
+                "name", "varchar", IsNullable: false),
             new(MigrationOperationType.CreateTable, "public", "orders"),
             new(MigrationOperationType.AddColumn, "public", "orders",
-                Column: "id", SqlType: "int4", IsNullable: false)
+                "id", "int4", IsNullable: false)
         };
 
         var result = SnapshotBuilder.ApplyMigrations(initialSnapshot, operations);
@@ -560,7 +559,7 @@ public class SnapshotBuilderTests
         var operations = new List<MigrationOperation>
         {
             new(MigrationOperationType.AddColumn, "public", "users",
-                Column: "name", SqlType: "varchar", IsNullable: false)
+                "name", "varchar", IsNullable: false)
         };
 
         var result = SnapshotBuilder.ApplyMigrations(initialSnapshot, operations);
@@ -576,7 +575,7 @@ public class SnapshotBuilderTests
         ]);
         var operations = new List<MigrationOperation>
         {
-            new(MigrationOperationType.DropColumn, "public", "users", Column: "nonexistent")
+            new(MigrationOperationType.DropColumn, "public", "users", "nonexistent")
         };
 
         var result = SnapshotBuilder.ApplyMigrations(initialSnapshot, operations);
@@ -594,7 +593,7 @@ public class SnapshotBuilderTests
         var operations = new List<MigrationOperation>
         {
             new(MigrationOperationType.AlterColumnType, "public", "users",
-                Column: "nonexistent", SqlType: "varchar")
+                "nonexistent", "varchar")
         };
 
         var result = SnapshotBuilder.ApplyMigrations(initialSnapshot, operations);
@@ -642,8 +641,8 @@ public class SnapshotBuilderTests
         var operations = new List<MigrationOperation>
         {
             new(MigrationOperationType.SetDefault, "public", "users",
-                Column: "status", DefaultSql: "'active'"),
-            new(MigrationOperationType.DropDefault, "public", "users", Column: "status")
+                "status", DefaultSql: "'active'"),
+            new(MigrationOperationType.DropDefault, "public", "users", "status")
         };
 
         var result = SnapshotBuilder.ApplyMigrations(initialSnapshot, operations);
@@ -666,32 +665,34 @@ public class SnapshotBuilderTests
         string? refSchema = null,
         string? refTable = null,
         string? refColumn = null)
-        => new(
-            ColumnName: name,
-            DataType: dataType,
-            UdtName: dataType,
-            CharacterMaximumLength: null,
-            NumericPrecision: null,
-            NumericScale: null,
-            DateTimePrecision: null,
-            IsNullable: isNullable,
-            ColumnDefault: columnDefault,
-            IsIdentity: false,
-            IdentityGeneration: null,
-            IsGenerated: false,
-            GenerationExpression: null,
-            IsPrimaryKey: false,
-            PkConstraintName: null,
-            IsUnique: isUnique,
-            UniqueConstraintName: uniqueConstraintName,
-            IsForeignKey: isForeignKey,
-            FkConstraintName: fkConstraintName,
-            ReferencesSchema: refSchema,
-            ReferencesTable: refTable,
-            ReferencesColumn: refColumn,
-            FkUpdateRule: null,
-            FkDeleteRule: null
+    {
+        return new ColumnSnapshot(
+            name,
+            dataType,
+            dataType,
+            null,
+            null,
+            null,
+            null,
+            isNullable,
+            columnDefault,
+            false,
+            null,
+            false,
+            null,
+            false,
+            null,
+            isUnique,
+            uniqueConstraintName,
+            isForeignKey,
+            fkConstraintName,
+            refSchema,
+            refTable,
+            refColumn,
+            null,
+            null
         );
+    }
 }
 
 // Test entity models for BuildFromModel tests
@@ -741,8 +742,8 @@ public class EntityWithUniqueColumn
 {
     [PrimaryKey] public int Id { get; set; }
 
-    [Column("email", IsUnique = true)]
-    public string Email { get; set; } = string.Empty;
+    [Unique]
+    [Column("email")] public string Email { get; set; } = string.Empty;
 }
 
 [Table("entities_with_fk", Schema = "public")]
@@ -766,6 +767,5 @@ public class EntityWithCascadeDelete
 [Table("manual_pk_entities", Schema = "public")]
 public class EntityWithManualPrimaryKey
 {
-    [PrimaryKey(AutoIncrement = false)]
-    public Guid Id { get; set; }
+    [PrimaryKey(AutoIncrement = false)] public Guid Id { get; set; }
 }

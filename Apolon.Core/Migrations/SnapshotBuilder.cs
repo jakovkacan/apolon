@@ -68,32 +68,32 @@ internal static class SnapshotBuilder
                 }
 
                 cols.Add(new ColumnSnapshot(
-                    ColumnName: colName,
-                    DataType: normalizedType,
-                    UdtName: normalizedType,
-                    CharacterMaximumLength: characterMaximumLength,
-                    NumericPrecision: numericPrecision,
-                    NumericScale: numericScale,
-                    DateTimePrecision: normalizedType == "timestamp" ? 6 : null,
-                    IsNullable: c.IsNullable,
-                    ColumnDefault: defaultSql,
-                    IsIdentity: isIdentity,
-                    IdentityGeneration: isIdentity ? "always" : null,
-                    IsGenerated: false,
-                    GenerationExpression: null,
-                    IsPrimaryKey: isPk,
-                    PkConstraintName: isPk ? SnapshotNormalization.NormalizeIdentifier($"{m.TableName}_pkey") : null,
-                    IsUnique: isUnique,
-                    UniqueConstraintName: isUnique
+                    colName,
+                    normalizedType,
+                    normalizedType,
+                    characterMaximumLength,
+                    numericPrecision,
+                    numericScale,
+                    normalizedType == "timestamp" ? 6 : null,
+                    c.IsNullable,
+                    defaultSql,
+                    isIdentity,
+                    isIdentity ? "always" : null,
+                    false,
+                    null,
+                    isPk,
+                    isPk ? SnapshotNormalization.NormalizeIdentifier($"{m.TableName}_pkey") : null,
+                    isUnique,
+                    isUnique
                         ? SnapshotNormalization.NormalizeIdentifier($"{m.TableName}_{c.ColumnName}_key")
                         : null,
-                    IsForeignKey: fk is not null,
-                    FkConstraintName: fkConstraintName,
-                    ReferencesSchema: refSchema,
-                    ReferencesTable: refTable,
-                    ReferencesColumn: refColumn,
-                    FkUpdateRule: OnDeleteBehavior.NoAction.ToSql(),
-                    FkDeleteRule: onDelete
+                    fk is not null,
+                    fkConstraintName,
+                    refSchema,
+                    refTable,
+                    refColumn,
+                    OnDeleteBehavior.NoAction.ToSql(),
+                    onDelete
                 ));
             }
 
@@ -111,7 +111,6 @@ internal static class SnapshotBuilder
         tables.AddRange(newTables);
 
         foreach (var op in operations)
-        {
             switch (op.Type)
             {
                 case MigrationOperationType.CreateSchema:
@@ -131,30 +130,30 @@ internal static class SnapshotBuilder
                     if (tableToAddColumn != null)
                     {
                         var newColumn = new ColumnSnapshot(
-                            ColumnName: op.Column!,
-                            DataType: op.SqlType ?? "unknown",
-                            UdtName: op.SqlType ?? "unknown",
-                            CharacterMaximumLength: op.CharacterMaximumLength,
-                            NumericPrecision: op.NumericPrecision,
-                            NumericScale: op.NumericScale,
-                            DateTimePrecision: op.DateTimePrecision,
-                            IsNullable: op.IsNullable ?? true,
-                            ColumnDefault: op.DefaultSql,
-                            IsIdentity: op.IsIdentity ?? false,
-                            IdentityGeneration: op.IdentityGeneration,
-                            IsGenerated: false,
-                            GenerationExpression: null,
-                            IsPrimaryKey: op.IsPrimaryKey ?? false,
-                            PkConstraintName: op.IsPrimaryKey == true ? $"{op.Table}_pkey" : null,
-                            IsUnique: false,
-                            UniqueConstraintName: null,
-                            IsForeignKey: op.RefTable != null,
-                            FkConstraintName: op.RefTable != null ? op.ConstraintName : null,
-                            ReferencesSchema: op.RefSchema,
-                            ReferencesTable: op.RefTable,
-                            ReferencesColumn: op.RefColumn,
-                            FkUpdateRule: op.RefTable != null ? "NO ACTION" : null,
-                            FkDeleteRule: op.OnDeleteRule
+                            op.Column!,
+                            op.SqlType ?? "unknown",
+                            op.SqlType ?? "unknown",
+                            op.CharacterMaximumLength,
+                            op.NumericPrecision,
+                            op.NumericScale,
+                            op.DateTimePrecision,
+                            op.IsNullable ?? true,
+                            op.DefaultSql,
+                            op.IsIdentity ?? false,
+                            op.IdentityGeneration,
+                            false,
+                            null,
+                            op.IsPrimaryKey ?? false,
+                            op.IsPrimaryKey == true ? $"{op.Table}_pkey" : null,
+                            false,
+                            null,
+                            op.RefTable != null,
+                            op.RefTable != null ? op.ConstraintName : null,
+                            op.RefSchema,
+                            op.RefTable,
+                            op.RefColumn,
+                            op.RefTable != null ? "NO ACTION" : null,
+                            op.OnDeleteRule
                         );
 
                         var updatedColumns = tableToAddColumn.Columns.Append(newColumn).ToList();
@@ -334,18 +333,20 @@ internal static class SnapshotBuilder
 
                     break;
             }
-        }
 
         return new SchemaSnapshot(tables);
     }
 
-    private static string FormatDefaultValueAsSql(object value) => value switch
+    private static string FormatDefaultValueAsSql(object value)
     {
-        string s => $"'{s.Replace("'", "''")}'",
-        bool b => b ? "true" : "false",
-        DateTime dt => $"'{dt:yyyy-MM-dd HH:mm:ss}'",
-        DateTimeOffset dto => $"'{dto:yyyy-MM-dd HH:mm:ss zzz}'",
-        Guid g => $"'{g}'",
-        _ => value.ToString() ?? throw new InvalidOperationException()
-    };
+        return value switch
+        {
+            string s => $"'{s.Replace("'", "''")}'",
+            bool b => b ? "true" : "false",
+            DateTime dt => $"'{dt:yyyy-MM-dd HH:mm:ss}'",
+            DateTimeOffset dto => $"'{dto:yyyy-MM-dd HH:mm:ss zzz}'",
+            Guid g => $"'{g}'",
+            _ => value.ToString() ?? throw new InvalidOperationException()
+        };
+    }
 }

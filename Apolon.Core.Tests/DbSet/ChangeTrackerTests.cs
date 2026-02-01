@@ -1,6 +1,5 @@
 ﻿using Apolon.Core.DbSet;
 using Apolon.Core.Exceptions;
-using Xunit;
 
 namespace Apolon.Core.Tests.DbSet;
 

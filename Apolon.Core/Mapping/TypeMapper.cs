@@ -13,20 +13,20 @@ public static class TypeMapper
         { typeof(decimal), "DECIMAL(18,2)" },
         { typeof(float), "FLOAT" },
         { typeof(double), "DOUBLE PRECISION" },
-        
+
         // String types
         { typeof(string), "VARCHAR(255)" },
-        
+
         // Date/Time types
         { typeof(DateTime), "TIMESTAMP" },
         { typeof(DateTimeOffset), "TIMESTAMP WITH TIME ZONE" },
-        
+
         // Boolean
         { typeof(bool), "BOOLEAN" },
-        
+
         // GUID
         { typeof(Guid), "UUID" },
-        
+
         // Binary
         { typeof(byte[]), "BYTEA" }
     };
@@ -35,7 +35,7 @@ public static class TypeMapper
     {
         // for nullable types
         var underlyingType = Nullable.GetUnderlyingType(csharpType);
-        
+
         csharpType = underlyingType ?? csharpType;
 
         return CSharpToPostgresTypeMap.TryGetValue(csharpType, out var pgType)
@@ -50,7 +50,7 @@ public static class TypeMapper
 
         // for nullable types
         var underlyingType = Nullable.GetUnderlyingType(targetType);
-        
+
         targetType = underlyingType ?? targetType;
 
         // special conversions
@@ -62,7 +62,7 @@ public static class TypeMapper
 
         if (targetType == typeof(Guid) && dbValue is Guid g)
             return g;
-        
+
         return Convert.ChangeType(dbValue, targetType);
     }
 

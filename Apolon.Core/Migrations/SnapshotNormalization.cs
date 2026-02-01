@@ -1,9 +1,13 @@
-﻿namespace Apolon.Core.Migrations;
+﻿using System.Text;
+
+namespace Apolon.Core.Migrations;
 
 internal static class SnapshotNormalization
 {
     public static string NormalizeIdentifier(string value)
-        => value.Trim().Trim('"').ToLowerInvariant();
+    {
+        return value.Trim().Trim('"').ToLowerInvariant();
+    }
 
     public static string NormalizeDataType(string dataType)
     {
@@ -38,7 +42,6 @@ internal static class SnapshotNormalization
         var parameters = parts.Length > 1 ? parts[1][..^1].Split(',') : [];
 
         if (parameters.Length == 0)
-        {
             return baseType switch
             {
                 "int" or "int4" => (null, 32, 0),
@@ -48,7 +51,6 @@ internal static class SnapshotNormalization
                 "varchar" => (255, null, null),
                 _ => (null, null, null)
             };
-        }
 
         return baseType switch
         {
@@ -80,7 +82,9 @@ internal static class SnapshotNormalization
     }
 
     internal static string CollapseWhitespace(string s)
-        => string.Join(' ', s.Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
+    {
+        return string.Join(' ', s.Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
+    }
 
     private static bool ParenthesesWrapWholeExpression(string s)
     {
@@ -99,7 +103,7 @@ internal static class SnapshotNormalization
 
     private static string StripPostgresCasts(string s)
     {
-        var result = new System.Text.StringBuilder(s.Length);
+        var result = new StringBuilder(s.Length);
         var inSingleQuote = false;
 
         for (var i = 0; i < s.Length; i++)

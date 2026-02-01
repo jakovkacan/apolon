@@ -16,15 +16,18 @@ public class Prescription : BaseEntity
     public required int MedicationId { get; set; }
 
     public required decimal Dosage { get; set; }
-    public required string DosageUnit { get; set; } 
-    public required string Frequency { get; set; } 
+    public required string DosageUnit { get; set; }
+    public required string Frequency { get; set; }
     public required DateTime StartDate { get; set; }
-    public DateTime? EndDate { get; set; } 
+    public DateTime? EndDate { get; set; }
 
     // Navigation properties
     public Checkup? Checkup { get; set; }
     public Medication? Medication { get; set; }
 
-    public override string ToString() =>
-        $"{nameof(CheckupId)}: {CheckupId}, {nameof(MedicationId)}: {MedicationId}, {nameof(Dosage)}: {Dosage}, {nameof(DosageUnit)}: {DosageUnit}, {nameof(Frequency)}: {Frequency}, {nameof(StartDate)}: {StartDate}, {nameof(EndDate)}: {EndDate}";
+    public override string ToString()
+    {
+        return
+            $"{nameof(CheckupId)}: {CheckupId}, {nameof(MedicationId)}: {MedicationId}, {nameof(Dosage)}: {Dosage}, {nameof(DosageUnit)}: {DosageUnit}, {nameof(Frequency)}: {Frequency}, {nameof(StartDate)}: {StartDate}, {nameof(EndDate)}: {EndDate}";
+    }
 }

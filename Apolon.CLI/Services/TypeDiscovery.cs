@@ -1,5 +1,5 @@
+using System.Diagnostics;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using Apolon.Core.Attributes;
 using Apolon.Core.Migrations.Models;
 
@@ -15,18 +15,12 @@ internal static class TypeDiscovery
 
         // Check if path is a .dll file
         if (File.Exists(path) && path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-        {
             projectPath = FindProjectFileForPath(path);
-        }
         // Check if it's a directory
         else if (Directory.Exists(path))
-        {
             projectPath = FindProjectFileForPath(path);
-        }
         else
-        {
             throw new InvalidOperationException($"Path not found or invalid: {path}");
-        }
 
         // If we found a project file, always rebuild it
         if (projectPath != null)
@@ -40,9 +34,7 @@ internal static class TypeDiscovery
         // Fallback: no project file found, load from existing assemblies
         Console.WriteLine("Warning: No project file found. Loading from existing assemblies without rebuilding.");
         if (File.Exists(path) && path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-        {
             return LoadTypesFromAssembly(path, hasTableAttribute);
-        }
 
         return LoadTypesFromDirectory(path, hasTableAttribute);
     }
@@ -60,10 +52,7 @@ internal static class TypeDiscovery
         while (currentDir is { Exists: true })
         {
             var projectFiles = currentDir.GetFiles("*.csproj", SearchOption.TopDirectoryOnly);
-            if (projectFiles.Length > 0)
-            {
-                return projectFiles[0].FullName;
-            }
+            if (projectFiles.Length > 0) return projectFiles[0].FullName;
 
             currentDir = currentDir.Parent;
         }
@@ -76,7 +65,7 @@ internal static class TypeDiscovery
         Console.WriteLine($"Rebuilding project to ensure latest state: {projectFile}");
 
         // Build the project
-        var buildProcess = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        var buildProcess = Process.Start(new ProcessStartInfo
         {
             FileName = "dotnet",
             Arguments = $"build \"{projectFile}\" --nologo --verbosity quiet",
@@ -115,7 +104,6 @@ internal static class TypeDiscovery
 
         // Try each assembly until we find types
         foreach (var assemblyFile in assemblyFiles)
-        {
             try
             {
                 var types = LoadTypesFromAssembly(assemblyFile, hasTableAttribute);
@@ -126,7 +114,6 @@ internal static class TypeDiscovery
             {
                 // Continue to next assembly
             }
-        }
 
         throw new InvalidOperationException(
             $"No entity types found after building: {projectFile}");
@@ -152,20 +139,16 @@ internal static class TypeDiscovery
     {
         var assemblyFiles = Directory.GetFiles(directoryPath, "*.dll", SearchOption.AllDirectories);
 
-        if (assemblyFiles.Length == 0)
-        {
-            throw new InvalidOperationException($"No assemblies found in: {directoryPath}");
-        }
+        if (assemblyFiles.Length == 0) throw new InvalidOperationException($"No assemblies found in: {directoryPath}");
 
         var entityTypes = new List<Type>();
 
         foreach (var assemblyFile in assemblyFiles)
-        {
             try
             {
                 var assembly = Assembly.LoadFrom(assemblyFile);
                 var types = assembly.GetTypes()
-                    .Where(t => (!hasTableAttribute || t.GetCustomAttribute<TableAttribute>() != null))
+                    .Where(t => !hasTableAttribute || t.GetCustomAttribute<TableAttribute>() != null)
                     .Where(t => t is { IsClass: true, IsAbstract: false })
                     .ToArray();
 
@@ -175,7 +158,6 @@ internal static class TypeDiscovery
             {
                 Console.WriteLine($"Warning: Could not load assembly {Path.GetFileName(assemblyFile)}: {ex.Message}");
             }
-        }
 
         return entityTypes.Count == 0
             ? throw new InvalidOperationException($"No entity types found in: {directoryPath}")
@@ -230,7 +212,6 @@ internal static class TypeDiscovery
         var migrationTypes = new List<(Type Type, string Timestamp, string Name)>();
 
         foreach (var dllFile in dllFiles)
-        {
             try
             {
                 var assembly = Assembly.LoadFrom(dllFile);
@@ -245,7 +226,6 @@ internal static class TypeDiscovery
             {
                 // Ignore assemblies that can't be loaded
             }
-        }
 
         return migrationTypes.OrderBy(m => m.Timestamp).ToArray();
     }
@@ -257,10 +237,7 @@ internal static class TypeDiscovery
         var className = type.Name;
 
         // Try to find timestamp from filename mapping
-        if (classNameToTimestamp.TryGetValue(className, out var timestamp))
-        {
-            return (type, timestamp, className);
-        }
+        if (classNameToTimestamp.TryGetValue(className, out var timestamp)) return (type, timestamp, className);
 
         // Fallback: class name might have timestamp (old format)
         return ParseMigrationNameFromClassName(type);
@@ -272,19 +249,13 @@ internal static class TypeDiscovery
 
         // Try format: YYYYMMDDHHMMSS_MigrationName (shouldn't happen with C# classes)
         var parts = className.Split('_', 2);
-        if (parts is [{ Length: 14 }, _] && long.TryParse(parts[0], out _))
-        {
-            return (type, parts[0], parts[1]);
-        }
+        if (parts is [{ Length: 14 }, _] && long.TryParse(parts[0], out _)) return (type, parts[0], parts[1]);
 
         // Try format with leading underscore: _YYYYMMDDHHMMSS_MigrationName
         if (className.StartsWith('_'))
         {
             parts = className[1..].Split('_', 2);
-            if (parts is [{ Length: 14 }, _] && long.TryParse(parts[0], out _))
-            {
-                return (type, parts[0], parts[1]);
-            }
+            if (parts is [{ Length: 14 }, _] && long.TryParse(parts[0], out _)) return (type, parts[0], parts[1]);
         }
 
         // Fallback: no timestamp found, use zeros

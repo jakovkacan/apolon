@@ -17,7 +17,7 @@ internal static class MigrationGenerator
         var sanitizedName = SanitizeMigrationName(migrationName);
 
         Console.WriteLine($"Discovering entity types in: {Path.GetFullPath(modelsPath)}");
-        var entityTypes = await TypeDiscovery.DiscoverEntityTypes(modelsPath, hasTableAttribute: true);
+        var entityTypes = await TypeDiscovery.DiscoverEntityTypes(modelsPath, true);
         Console.WriteLine(
             $"Found {entityTypes.Length} entity types: {string.Join(", ", entityTypes.Select(t => t.Name))}");
 
@@ -30,21 +30,23 @@ internal static class MigrationGenerator
         Console.WriteLine("Fetching applied migrations...");
         var appliedMigrations = await FetchAppliedMigrationsAsync(connectionString);
         appliedMigrations = appliedMigrations?.Select(m => m[(m.IndexOf('_') + 1)..]).ToList();
-        
-        Console.WriteLine($"Found {appliedMigrations?.Count ?? 0} applied migrations: {string.Join(", ", appliedMigrations ?? [])}");
+
+        Console.WriteLine(
+            $"Found {appliedMigrations?.Count ?? 0} applied migrations: {string.Join(", ", appliedMigrations ?? [])}");
 
         Console.WriteLine("Fetching commited migrations...");
-        var migrationTypes = await TypeDiscovery.DiscoverMigrationTypes(migrationsPath, rebuildProject: false);
+        var migrationTypes = await TypeDiscovery.DiscoverMigrationTypes(migrationsPath, false);
         var committedMigrations = migrationTypes
             .Where(mt => !appliedMigrations?.Contains($"{mt.Name}") ?? true)
             .Select(mt => mt.Type)
             .ToList();
-        
-        Console.WriteLine($"Found {committedMigrations.Count} commited but not applied migrations: {string.Join(", ", committedMigrations.Select(m => m.Name))}");
-        
+
+        Console.WriteLine(
+            $"Found {committedMigrations.Count} commited but not applied migrations: {string.Join(", ", committedMigrations.Select(m => m.Name))}");
+
         var committedOperations = MigrationUtils.ExtractOperationsFromMigrationTypes(committedMigrations);
         var commitedSnapshot = SnapshotBuilder.ApplyMigrations(dbSnapshot, committedOperations);
-        
+
         Console.WriteLine("Comparing snapshots...");
         var operations = SchemaDiffer.Diff(modelSnapshot, commitedSnapshot);
         Console.WriteLine($"Found {operations.Count} migration operations");

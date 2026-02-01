@@ -1,5 +1,4 @@
 ﻿using System.CommandLine;
-using System.CommandLine.Invocation;
 using Apolon.CLI.Services;
 
 namespace Apolon.CLI.Commands;
@@ -15,20 +14,18 @@ internal static class InitCommand
             "Database connection string");
 
         var modelsPathOption = new Option<string>(
-            aliases: ["--models-path", "-m"],
-            getDefaultValue: () => ".\\Models",
-            description: "Path to the models directory or assembly");
+            ["--models-path", "-m"],
+            () => ".\\Models",
+            "Path to the models directory or assembly");
 
         var outputPathOption = new Option<string?>(
-            aliases: ["--output-path", "-o"],
-            getDefaultValue: () => null,
-            description:
+            ["--output-path", "-o"],
+            () => null,
             "Output path for the DbContext file (if not specified, will be placed in the models directory)");
 
         var namespaceOption = new Option<string?>(
-            aliases: ["--namespace", "-n"],
-            getDefaultValue: () => null,
-            description:
+            ["--namespace", "-n"],
+            () => null,
             "Namespace for the generated DbContext class (if not specified, will be inferred from output directory)");
 
         command.AddArgument(connectionStringArg);
@@ -36,7 +33,7 @@ internal static class InitCommand
         command.AddOption(outputPathOption);
         command.AddOption(namespaceOption);
 
-        command.SetHandler(async (InvocationContext context) =>
+        command.SetHandler(async context =>
         {
             var connectionString = context.ParseResult.GetValueForArgument(connectionStringArg);
             var modelsPath = context.ParseResult.GetValueForOption(modelsPathOption)!;
@@ -69,7 +66,7 @@ internal static class InitCommand
                 };
 
                 await ProjectConfiguration.SaveAsync(config, Directory.GetCurrentDirectory());
-                Console.WriteLine($"Configuration saved to .apolon.json");
+                Console.WriteLine("Configuration saved to .apolon.json");
 
                 context.ExitCode = 0;
             }
@@ -80,9 +77,7 @@ internal static class InitCommand
                 Console.ResetColor();
 
                 if (ex.InnerException != null)
-                {
                     await Console.Error.WriteLineAsync($"Inner exception: {ex.InnerException.Message}");
-                }
 
                 context.ExitCode = 1;
             }

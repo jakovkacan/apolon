@@ -11,12 +11,12 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Apolon.Models\Apolon.Models.csproj" />
+        <ProjectReference Include="..\Apolon.Models\Apolon.Models.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Context\" />
-      <Folder Include="Migrations\" />
+        <Folder Include="Context\"/>
+        <Folder Include="Migrations\"/>
     </ItemGroup>
 
 </Project>

@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.Data.Common;
+using System.Reflection;
 using Apolon.Core.Attributes;
 using Apolon.Core.Exceptions;
 using Apolon.Core.Mapping.Models;
@@ -54,6 +55,7 @@ internal static class EntityMapper
             var columnAttr = prop.GetCustomAttribute<ColumnAttribute>();
             var isRequiredAttrPresent = prop.GetCustomAttribute<RequiredAttribute>() != null;
             var isOptionalAttrPresent = prop.GetCustomAttribute<OptionalAttribute>() != null;
+            var isUniqueAttrPresent = prop.GetCustomAttribute<UniqueAttribute>() != null;
 
             var columnName = columnAttr?.Name ?? MapperUtils.ConvertPascalToSnakeCase(prop.Name);
             var dbType = columnAttr?.DbType ?? TypeMapper.GetPostgresType(prop.PropertyType);
@@ -61,12 +63,11 @@ internal static class EntityMapper
             // 1) [Required] => NOT NULL
             // 2) [Optional] => NULL
             // 3) infer from nullable reference types
-            var inferredNullable = IsPropertyNullable(nullabilityContext, prop);            
+            var inferredNullable = IsPropertyNullable(nullabilityContext, prop);
             var isNullable = !isRequiredAttrPresent && (isOptionalAttrPresent || inferredNullable);
-            
+
             var defaultValue = columnAttr?.DefaultValue;
             var defaultIsRawSql = columnAttr?.DefaultIsRawSql ?? false;
-            var isUnique = columnAttr?.IsUnique ?? false;
 
             columns.Add(new PropertyMetadata
             {
@@ -76,7 +77,7 @@ internal static class EntityMapper
                 IsNullable = isNullable,
                 DefaultValue = defaultValue,
                 DefaultIsRawSql = defaultIsRawSql,
-                IsUnique = isUnique,
+                IsUnique = isUniqueAttrPresent,
                 Property = prop
             });
         }
@@ -134,7 +135,6 @@ internal static class EntityMapper
         var relationships = new List<RelationshipMetadata>();
 
         foreach (var prop in entityType.GetProperties())
-        {
             // 1-to-Many: ICollection<T>
             if (prop.PropertyType.IsGenericType &&
                 prop.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>))
@@ -154,7 +154,6 @@ internal static class EntityMapper
                 // Determine if FK property exists with matching name
                 var fkProp = entityType.GetProperty(prop.Name + "Id");
                 if (fkProp?.GetCustomAttribute<ForeignKeyAttribute>() != null)
-                {
                     relationships.Add(new RelationshipMetadata
                     {
                         PropertyName = prop.Name,
@@ -163,9 +162,7 @@ internal static class EntityMapper
                         ForeignKeyProperty = fkProp.Name,
                         Property = prop
                     });
-                }
             }
-        }
 
         return relationships;
     }
@@ -185,5 +182,34 @@ internal static class EntityMapper
 
         // non-nullable
         return false;
+    }
+
+    public static T MapEntity<T>(DbDataReader reader, EntityMetadata metadata) where T : class
+    {
+        var entity = Activator.CreateInstance<T>();
+        foreach (var column in metadata.Columns)
+        {
+            var ordinal = reader.GetOrdinal(column.ColumnName);
+            var value = reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);
+            column.Property.SetValue(entity, TypeMapper.ConvertFromDb(value, column.Property.PropertyType));
+        }
+
+        return entity;
+    }
+
+    public static object MapEntity(DbDataReader reader, EntityMetadata metadata)
+    {
+        var entity = Activator.CreateInstance(metadata.EntityType)
+                     ?? throw new InvalidOperationException($"Could not create instance of {metadata.EntityType.Name}");
+
+        foreach (var column in metadata.Columns)
+        {
+            var ordinal = reader.GetOrdinal(column.ColumnName);
+            var value = reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);
+            var convertedValue = TypeMapper.ConvertFromDb(value, column.Property.PropertyType);
+            column.Property.SetValue(entity, convertedValue);
+        }
+
+        return entity;
     }
 }

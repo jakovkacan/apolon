@@ -1,6 +1,5 @@
 using Apolon.Core.Migrations;
 using Apolon.Core.Migrations.Models;
-using Xunit;
 
 namespace Apolon.Core.Tests.Migrations;
 
@@ -55,17 +54,17 @@ public class SchemaDifferTests
                 Column("id"),
                 Column(
                     "role_id",
-                    dataType: "int4",
-                    isNullable: false,
-                    columnDefault: "1",
-                    isUnique: true,
-                    uniqueName: "users_role_id_key",
-                    isForeignKey: true,
-                    fkName: "fk_users_role_id",
-                    refSchema: "public",
-                    refTable: "roles",
-                    refColumn: "id",
-                    fkDelete: "cascade"
+                    "int4",
+                    false,
+                    "1",
+                    true,
+                    "users_role_id_key",
+                    true,
+                    "fk_users_role_id",
+                    "public",
+                    "roles",
+                    "id",
+                    "cascade"
                 )),
             Table("public", "roles", Column("id"))
         ]);
@@ -109,12 +108,12 @@ public class SchemaDifferTests
     {
         var expected = new SchemaSnapshot([
             Table("public", "users",
-                Column("name", dataType: "varchar", isNullable: false, columnDefault: "'n/a'"))
+                Column("name", "varchar", false, "'n/a'"))
         ]);
 
         var actual = new SchemaSnapshot([
             Table("public", "users",
-                Column("name", dataType: "int4", isNullable: true, columnDefault: null))
+                Column("name", "int4", true, null))
         ]);
 
         var ops = SchemaDiffer.Diff(expected, actual);
@@ -146,8 +145,8 @@ public class SchemaDifferTests
     [Fact]
     public void Diff_ColumnTypeParameters_ProducesAlterWithSqlTypeDetails()
     {
-        var expectedCol = Column("name", dataType: "varchar", charMaxLen: 25);
-        var actualCol = Column("name", dataType: "varchar", charMaxLen: 50);
+        var expectedCol = Column("name", "varchar", charMaxLen: 25);
+        var actualCol = Column("name", "varchar", charMaxLen: 50);
 
         Assert.Equal(25, expectedCol.CharacterMaximumLength);
         Assert.Equal(50, actualCol.CharacterMaximumLength);
@@ -188,12 +187,12 @@ public class SchemaDifferTests
     {
         var expected = new SchemaSnapshot([
             Table("public", "users",
-                Column("status", dataType: "varchar", isNullable: true, columnDefault: null))
+                Column("status", "varchar", true, null))
         ]);
 
         var actual = new SchemaSnapshot([
             Table("public", "users",
-                Column("status", dataType: "varchar", isNullable: true, columnDefault: "'active'"))
+                Column("status", "varchar", true, "'active'"))
         ]);
 
         var ops = SchemaDiffer.Diff(expected, actual);
@@ -275,7 +274,7 @@ public class SchemaDifferTests
             Table("public", "users",
                 Column("id"),
                 Column("name"),
-                Column("old_column", dataType: "varchar"))
+                Column("old_column", "varchar"))
         ]);
 
         var ops = SchemaDiffer.Diff(expected, actual);
@@ -364,20 +363,20 @@ public class SchemaDifferTests
         var committedOps = new List<MigrationOperation>
         {
             new(
-                Type: MigrationOperationType.AddColumn,
-                Schema: "public",
-                Table: "users",
-                Column: "name",
-                SqlType: "int4",
-                CharacterMaximumLength: null,
-                NumericPrecision: null,
-                NumericScale: null,
-                DateTimePrecision: null,
-                IsPrimaryKey: false,
-                IsIdentity: false,
-                IdentityGeneration: null,
-                IsNullable: false,
-                DefaultSql: null
+                MigrationOperationType.AddColumn,
+                "public",
+                "users",
+                "name",
+                "int4",
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                null,
+                false,
+                null
             )
         };
 
@@ -470,7 +469,9 @@ public class SchemaDifferTests
     }
 
     private static TableSnapshot Table(string schema, string table, params ColumnSnapshot[] cols)
-        => new(schema, table, cols);
+    {
+        return new TableSnapshot(schema, table, cols);
+    }
 
     private static ColumnSnapshot Column(
         string name,
@@ -492,30 +493,32 @@ public class SchemaDifferTests
         bool isPrimaryKey = false,
         bool isIdentity = false,
         string? identityGeneration = null)
-        => new(
-            ColumnName: name,
-            DataType: dataType,
-            UdtName: dataType,
-            CharacterMaximumLength: charMaxLen,
-            NumericPrecision: numericPrecision,
-            NumericScale: numericScale,
-            DateTimePrecision: dateTimePrecision,
-            IsNullable: isNullable,
-            ColumnDefault: columnDefault,
-            IsIdentity: isIdentity,
-            IdentityGeneration: identityGeneration,
-            IsGenerated: false,
-            GenerationExpression: null,
-            IsPrimaryKey: isPrimaryKey,
-            PkConstraintName: null,
-            IsUnique: isUnique,
-            UniqueConstraintName: uniqueName,
-            IsForeignKey: isForeignKey,
-            FkConstraintName: fkName,
-            ReferencesSchema: refSchema,
-            ReferencesTable: refTable,
-            ReferencesColumn: refColumn,
-            FkUpdateRule: null,
-            FkDeleteRule: fkDelete
+    {
+        return new ColumnSnapshot(
+            name,
+            dataType,
+            dataType,
+            charMaxLen,
+            numericPrecision,
+            numericScale,
+            dateTimePrecision,
+            isNullable,
+            columnDefault,
+            isIdentity,
+            identityGeneration,
+            false,
+            null,
+            isPrimaryKey,
+            null,
+            isUnique,
+            uniqueName,
+            isForeignKey,
+            fkName,
+            refSchema,
+            refTable,
+            refColumn,
+            null,
+            fkDelete
         );
+    }
 }

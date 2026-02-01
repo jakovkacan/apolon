@@ -1,4 +1,5 @@
-﻿using System.Data.Common;
+﻿using System.Data;
+using System.Data.Common;
 using Apolon.Core.Sql;
 
 namespace Apolon.Core.DataAccess;
@@ -6,8 +7,8 @@ namespace Apolon.Core.DataAccess;
 public interface IDbConnection : IDisposable
 {
     public string ConnectionString { get; }
-    public System.Data.ConnectionState State { get; }
-    
+    public ConnectionState State { get; }
+
     public void OpenConnection();
     public Task OpenConnectionAsync();
 

@@ -7,13 +7,11 @@ namespace Apolon.Core.Migrations;
 
 public class MigrationRunner
 {
-    private readonly IDbConnection _connection;
-    private readonly EntityExecutor _executor;
+    private readonly DatabaseExecutor _executor;
 
     private MigrationRunner(IDbConnection connection)
     {
-        _connection = connection;
-        _executor = new EntityExecutor(connection);
+        _executor = new DatabaseExecutor(connection);
     }
 
     public static async Task<MigrationRunner> CreateAsync(IDbConnection connection)
@@ -54,9 +52,7 @@ public class MigrationRunner
             if (targetMigration != null &&
                 (migration.Name.Equals(targetMigration, StringComparison.OrdinalIgnoreCase) ||
                  fullName.Equals(targetMigration, StringComparison.OrdinalIgnoreCase)))
-            {
                 break;
-            }
         }
 
         return toRun;
@@ -146,7 +142,7 @@ public class MigrationRunner
             migration.Down(builder);
 
             var sqlBatch = MigrationUtils.ConvertOperationsToSql(builder.Operations);
-            await ExecuteSqlAsync(sqlBatch, ct);
+            await _executor.ExecuteSqlAsync(sqlBatch, ct);
 
             await RemoveMigration(fullName);
             rolledBack++;
@@ -166,7 +162,7 @@ public class MigrationRunner
             migration.Up(builder);
 
             var sqlBatch = MigrationUtils.ConvertOperationsToSql(builder.Operations);
-            await ExecuteSqlAsync(sqlBatch);
+            await _executor.ExecuteSqlAsync(sqlBatch);
 
             await RecordMigration(migrationType.Name);
         }
@@ -201,26 +197,6 @@ public class MigrationRunner
     //     }
     // }
 
-    private async Task ExecuteSqlAsync(List<string> sqlBatch, CancellationToken ct = default)
-    {
-        if (sqlBatch.Count == 0)
-            return;
-
-        await _connection.BeginTransactionAsync(ct);
-        try
-        {
-            foreach (var sql in sqlBatch)
-                await _connection.ExecuteNonQueryAsync(_connection.CreateCommand(sql));
-
-            await _connection.CommitTransactionAsync(ct);
-        }
-        catch
-        {
-            await _connection.RollbackTransactionAsync(ct);
-            throw;
-        }
-    }
-
     private async Task EnsureMigrationHistoryTable()
     {
         var sql = new List<string>
@@ -229,7 +205,7 @@ public class MigrationRunner
             MigrationBuilderSql.BuildCreateTable(typeof(MigrationHistoryTable))
         };
 
-        await ExecuteSqlAsync(sql);
+        await _executor.ExecuteSqlAsync(sql);
     }
 
     private async Task<bool> IsMigrationApplied(string migrationName)

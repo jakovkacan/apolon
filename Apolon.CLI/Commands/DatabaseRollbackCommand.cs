@@ -1,5 +1,4 @@
 ﻿using System.CommandLine;
-using System.CommandLine.Invocation;
 using Apolon.CLI.Services;
 
 namespace Apolon.CLI.Commands;
@@ -15,14 +14,14 @@ internal static class DatabaseRollbackCommand
             "Target migration name to rollback to (will rollback all migrations after this one)");
 
         var connectionStringOption = new Option<string?>(
-            aliases: ["--connection-string", "-c"],
-            getDefaultValue: () => null,
-            description: "Database connection string (defaults to config)");
+            ["--connection-string", "-c"],
+            () => null,
+            "Database connection string (defaults to config)");
 
         var migrationsPathOption = new Option<string?>(
-            aliases: ["--migrations-path", "-m"],
-            getDefaultValue: () => null,
-            description: "Path to migrations directory (defaults to config)");
+            ["--migrations-path", "-m"],
+            () => null,
+            "Path to migrations directory (defaults to config)");
 
         command.AddArgument(targetMigrationArg);
         command.AddOption(connectionStringOption);
@@ -48,7 +47,7 @@ internal static class DatabaseRollbackCommand
                 Console.WriteLine($"Migrations: {migrationsPath}");
                 Console.WriteLine($"Target: {targetMigration}");
                 Console.WriteLine();
-                
+
                 await MigrationExecutor.RollbackMigrationsAsync(
                     connectionString,
                     migrationsPath,
@@ -63,9 +62,8 @@ internal static class DatabaseRollbackCommand
                 Console.ResetColor();
 
                 if (ex.InnerException != null)
-                {
-                    await Console.Error.WriteLineAsync($"Inner exception: {ex.InnerException.Message} {ex.InnerException.StackTrace}");
-                }
+                    await Console.Error.WriteLineAsync(
+                        $"Inner exception: {ex.InnerException.Message} {ex.InnerException.StackTrace}");
 
                 context.ExitCode = 1;
             }
@@ -79,19 +77,19 @@ internal static class DatabaseRollbackCommand
         // Mask password in connection string for display
         var masked = connectionString;
         var passwordIndex = masked.IndexOf("Password=", StringComparison.OrdinalIgnoreCase);
-        
+
         if (passwordIndex >= 0)
         {
             var start = passwordIndex + "Password=".Length;
             var end = masked.IndexOf(';', start);
-            
+
             if (end < 0)
                 end = masked.Length;
-            
+
             var passwordLength = end - start;
             masked = masked.Substring(0, start) + new string('*', Math.Min(passwordLength, 8)) + masked.Substring(end);
         }
-        
+
         return masked;
     }
 }

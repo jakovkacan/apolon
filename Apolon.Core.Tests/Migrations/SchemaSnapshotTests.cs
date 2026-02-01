@@ -1,5 +1,4 @@
 using Apolon.Core.Migrations.Models;
-using Xunit;
 
 namespace Apolon.Core.Tests.Migrations;
 
@@ -32,30 +31,32 @@ public class SchemaSnapshotTests
     }
 
     private static ColumnSnapshot Col(string name, string? columnDefault = null)
-        => new(
-            ColumnName: name,
-            DataType: "int4",
-            UdtName: "int4",
-            CharacterMaximumLength: null,
-            NumericPrecision: null,
-            NumericScale: null,
-            DateTimePrecision: null,
-            IsNullable: false,
-            ColumnDefault: columnDefault,
-            IsIdentity: false,
-            IdentityGeneration: null,
-            IsGenerated: false,
-            GenerationExpression: null,
-            IsPrimaryKey: false,
-            PkConstraintName: null,
-            IsUnique: false,
-            UniqueConstraintName: null,
-            IsForeignKey: false,
-            FkConstraintName: null,
-            ReferencesSchema: null,
-            ReferencesTable: null,
-            ReferencesColumn: null,
-            FkUpdateRule: null,
-            FkDeleteRule: null
+    {
+        return new ColumnSnapshot(
+            name,
+            "int4",
+            "int4",
+            null,
+            null,
+            null,
+            null,
+            false,
+            columnDefault,
+            false,
+            null,
+            false,
+            null,
+            false,
+            null,
+            false,
+            null,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
         );
+    }
 }

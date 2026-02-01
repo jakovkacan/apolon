@@ -4,7 +4,8 @@ A command-line tool for generating database migrations by comparing your entity 
 
 ## Features
 
-- **Automatic Migration Generation**: Scans your Models directory and generates migrations based on differences between models and database
+- **Automatic Migration Generation**: Scans your Models directory and generates migrations based on differences between
+  models and database
 - **Schema Diffing**: Uses `ModelSnapshotBuilder`, `SnapshotReader`, and `SchemaDiffer` to detect changes
 - **Type-Safe**: Generates strongly-typed C# migration files that use `MigrationBuilder` API
 - **Reversible**: Generates both `Up()` and `Down()` methods
@@ -12,6 +13,7 @@ A command-line tool for generating database migrations by comparing your entity 
 ## Installation
 
 Build the project:
+
 ```bash
 dotnet build Apolon.CLI/Apolon.CLI.csproj
 ```
@@ -120,19 +122,24 @@ public sealed class 20260126123045_InitialCreate : Migration
 ## Troubleshooting
 
 ### "No compiled assemblies found"
+
 Make sure to build your Models project first:
+
 ```bash
 dotnet build Apolon.Models
 ```
 
 ### "No entity types with [Table] attribute found"
+
 Ensure your entity classes are decorated with `[Table]` attribute:
+
 ```csharp
 [Table("patients", Schema = "public")]
 public class Patient { ... }
 ```
 
 ### Connection errors
+
 Verify your connection string is correct and the database is accessible.
 
 ## Architecture

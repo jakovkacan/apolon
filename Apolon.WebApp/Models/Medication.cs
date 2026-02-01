@@ -1,5 +1,4 @@
 ﻿using Apolon.Core.Attributes;
-using Apolon.Models;
 
 namespace Apolon.WebApp.Models;
 
@@ -13,6 +12,9 @@ public class Medication : BaseEntity
     // Navigation properties
     public ICollection<Prescription> Prescriptions { get; set; } = new List<Prescription>();
 
-    public override string ToString() =>
-        $"{nameof(Name)}: {Name}, {nameof(GenericName)}: {GenericName}, {nameof(DosageForm)}: {DosageForm}, {nameof(Prescriptions)}: {Prescriptions}";
+    public override string ToString()
+    {
+        return
+            $"{nameof(Name)}: {Name}, {nameof(GenericName)}: {GenericName}, {nameof(DosageForm)}: {DosageForm}, {nameof(Prescriptions)}: {Prescriptions}";
+    }
 }

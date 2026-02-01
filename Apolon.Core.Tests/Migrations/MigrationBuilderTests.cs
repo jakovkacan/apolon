@@ -1,6 +1,5 @@
 ﻿using Apolon.Core.Migrations;
 using Apolon.Core.Migrations.Models;
-using Xunit;
 
 namespace Apolon.Core.Tests.Migrations;
 
@@ -65,7 +64,7 @@ public class MigrationBuilderTests
     {
         var builder = new MigrationBuilder();
 
-        builder.AddColumn("public", "users", "name", "varchar", isNullable: false);
+        builder.AddColumn("public", "users", "name", "varchar", false);
 
         var operation = Assert.Single(builder.Operations);
         Assert.Equal(MigrationOperationType.AddColumn, operation.Type);
@@ -84,7 +83,7 @@ public class MigrationBuilderTests
     {
         var builder = new MigrationBuilder();
 
-        builder.AddColumn("public", "users", "email", "varchar", isNullable: true);
+        builder.AddColumn("public", "users", "email", "varchar", true);
 
         var operation = Assert.Single(builder.Operations);
         Assert.True(operation.IsNullable);
@@ -95,7 +94,7 @@ public class MigrationBuilderTests
     {
         var builder = new MigrationBuilder();
 
-        builder.AddColumn("public", "users", "status", "varchar", isNullable: false, defaultSql: "'active'");
+        builder.AddColumn("public", "users", "status", "varchar", false, "'active'");
 
         var operation = Assert.Single(builder.Operations);
         Assert.Equal("'active'", operation.DefaultSql);
@@ -106,7 +105,7 @@ public class MigrationBuilderTests
     {
         var builder = new MigrationBuilder();
 
-        builder.AddColumn("public", "users", "id", "int4", isNullable: false, isPrimaryKey: true);
+        builder.AddColumn("public", "users", "id", "int4", false, isPrimaryKey: true);
 
         var operation = Assert.Single(builder.Operations);
         Assert.True(operation.IsPrimaryKey);
@@ -117,7 +116,7 @@ public class MigrationBuilderTests
     {
         var builder = new MigrationBuilder();
 
-        builder.AddColumn("public", "users", "id", "int4", isNullable: false, 
+        builder.AddColumn("public", "users", "id", "int4", false,
             isPrimaryKey: true, isIdentity: true, identityGeneration: "always");
 
         var operation = Assert.Single(builder.Operations);
@@ -130,9 +129,9 @@ public class MigrationBuilderTests
     {
         var builder = new MigrationBuilder();
 
-        builder.AddColumn("custom", "entities", "pk_id", "bigint", 
-            isNullable: false, defaultSql: "1", isPrimaryKey: true, 
-            isIdentity: true, identityGeneration: "by default");
+        builder.AddColumn("custom", "entities", "pk_id", "bigint",
+            false, "1", true,
+            true, "by default");
 
         var operation = Assert.Single(builder.Operations);
         Assert.Equal(MigrationOperationType.AddColumn, operation.Type);
@@ -194,7 +193,7 @@ public class MigrationBuilderTests
     {
         var builder = new MigrationBuilder();
 
-        builder.AlterNullability("public", "users", "phone", isNullable: true);
+        builder.AlterNullability("public", "users", "phone", true);
 
         var operation = Assert.Single(builder.Operations);
         Assert.Equal(MigrationOperationType.AlterNullability, operation.Type);
@@ -209,7 +208,7 @@ public class MigrationBuilderTests
     {
         var builder = new MigrationBuilder();
 
-        builder.AlterNullability("public", "users", "email", isNullable: false);
+        builder.AlterNullability("public", "users", "email", false);
 
         var operation = Assert.Single(builder.Operations);
         Assert.False(operation.IsNullable);
@@ -277,7 +276,7 @@ public class MigrationBuilderTests
     {
         var builder = new MigrationBuilder();
 
-        builder.AddForeignKey("public", "orders", "user_id", "fk_orders_user", 
+        builder.AddForeignKey("public", "orders", "user_id", "fk_orders_user",
             "public", "users", "id");
 
         var operation = Assert.Single(builder.Operations);
@@ -297,8 +296,8 @@ public class MigrationBuilderTests
     {
         var builder = new MigrationBuilder();
 
-        builder.AddForeignKey("public", "orders", "user_id", "fk_orders_user", 
-            "public", "users", "id", onDeleteRule: "CASCADE");
+        builder.AddForeignKey("public", "orders", "user_id", "fk_orders_user",
+            "public", "users", "id", "CASCADE");
 
         var operation = Assert.Single(builder.Operations);
         Assert.Equal("CASCADE", operation.OnDeleteRule);
@@ -309,8 +308,8 @@ public class MigrationBuilderTests
     {
         var builder = new MigrationBuilder();
 
-        builder.AddForeignKey("public", "orders", "user_id", "fk_orders_user", 
-            "public", "users", "id", onDeleteRule: "SET NULL");
+        builder.AddForeignKey("public", "orders", "user_id", "fk_orders_user",
+            "public", "users", "id", "SET NULL");
 
         var operation = Assert.Single(builder.Operations);
         Assert.Equal("SET NULL", operation.OnDeleteRule);
@@ -321,7 +320,7 @@ public class MigrationBuilderTests
     {
         var builder = new MigrationBuilder();
 
-        builder.AddForeignKey("custom", "orders", "user_id", "fk_orders_user", 
+        builder.AddForeignKey("custom", "orders", "user_id", "fk_orders_user",
             "public", "users", "id");
 
         var operation = Assert.Single(builder.Operations);
@@ -344,8 +343,8 @@ public class MigrationBuilderTests
 
         builder.CreateSchema("public");
         builder.CreateTable("public", "users");
-        builder.AddColumn("public", "users", "id", "int4", isNullable: false, isPrimaryKey: true);
-        builder.AddColumn("public", "users", "name", "varchar", isNullable: false);
+        builder.AddColumn("public", "users", "id", "int4", false, isPrimaryKey: true);
+        builder.AddColumn("public", "users", "name", "varchar", false);
 
         Assert.Equal(4, builder.Operations.Count);
         Assert.Equal(MigrationOperationType.CreateSchema, builder.Operations[0].Type);
@@ -372,12 +371,12 @@ public class MigrationBuilderTests
 
         builder.CreateSchema("app");
         builder.CreateTable("app", "users");
-        builder.AddColumn("app", "users", "id", "int4", isNullable: false, isPrimaryKey: true, isIdentity: true);
-        builder.AddColumn("app", "users", "email", "varchar", isNullable: false);
+        builder.AddColumn("app", "users", "id", "int4", false, isPrimaryKey: true, isIdentity: true);
+        builder.AddColumn("app", "users", "email", "varchar", false);
         builder.AddUnique("app", "users", "email");
         builder.CreateTable("app", "orders");
-        builder.AddColumn("app", "orders", "id", "int4", isNullable: false, isPrimaryKey: true);
-        builder.AddColumn("app", "orders", "user_id", "int4", isNullable: false);
+        builder.AddColumn("app", "orders", "id", "int4", false, isPrimaryKey: true);
+        builder.AddColumn("app", "orders", "user_id", "int4", false);
         builder.AddForeignKey("app", "orders", "user_id", "fk_orders_user", "app", "users", "id", "CASCADE");
         builder.DropTable("app", "legacy_table");
 
@@ -400,7 +399,7 @@ public class MigrationBuilderTests
         var builder = new MigrationBuilder();
 
         builder.AlterColumnType("public", "users", "age", "int4");
-        builder.AlterNullability("public", "users", "age", isNullable: true);
+        builder.AlterNullability("public", "users", "age", true);
         builder.SetDefault("public", "users", "age", "0");
 
         Assert.Equal(3, builder.Operations.Count);
@@ -452,7 +451,7 @@ public class MigrationBuilderTests
     {
         var builder = new MigrationBuilder();
 
-        builder.AddColumn("public", "users", "middle_name", "varchar", isNullable: true, defaultSql: null);
+        builder.AddColumn("public", "users", "middle_name", "varchar", true, null);
 
         var operation = Assert.Single(builder.Operations);
         Assert.Null(operation.DefaultSql);
@@ -463,8 +462,8 @@ public class MigrationBuilderTests
     {
         var builder = new MigrationBuilder();
 
-        builder.AddForeignKey("public", "orders", "user_id", "fk_orders_user", 
-            "public", "users", "id", onDeleteRule: null);
+        builder.AddForeignKey("public", "orders", "user_id", "fk_orders_user",
+            "public", "users", "id", null);
 
         var operation = Assert.Single(builder.Operations);
         Assert.Null(operation.OnDeleteRule);

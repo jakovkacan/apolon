@@ -20,10 +20,7 @@ internal static class MigrationExecutor
         }
 
         Console.WriteLine($"Found {migrationTypes.Length} migration(s):");
-        foreach (var (_, timestamp, name) in migrationTypes)
-        {
-            Console.WriteLine($"  - {timestamp}_{name}");
-        }
+        foreach (var (_, timestamp, name) in migrationTypes) Console.WriteLine($"  - {timestamp}_{name}");
 
         await using var connection = new DbConnectionNpgsql(connectionString);
         await connection.OpenConnectionAsync();
@@ -42,10 +39,7 @@ internal static class MigrationExecutor
 
         Console.WriteLine($"\nApplying {toRun.Count} migration(s)...");
         // Optionally print each migration being applied
-        foreach (var (_, _, _, fullName) in toRun)
-        {
-            Console.WriteLine($"  - {fullName}");
-        }
+        foreach (var (_, _, _, fullName) in toRun) Console.WriteLine($"  - {fullName}");
 
         var executed = await runner.ApplyMigrationsAsync(migrationTypes, targetMigration);
         Console.WriteLine($"\n✓ Successfully applied {executed} migration(s)");
@@ -87,10 +81,7 @@ internal static class MigrationExecutor
         }
 
         Console.WriteLine($"\nRolling back {toRollback.Count} migration(s) to reach '{targetMigration}':");
-        foreach (var full in toRollback)
-        {
-            Console.WriteLine($"  - {full}");
-        }
+        foreach (var full in toRollback) Console.WriteLine($"  - {full}");
 
         Console.WriteLine("\n⚠ Warning: Rollback operations may result in data loss!");
         Console.Write("Continue? (y/N): ");

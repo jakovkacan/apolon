@@ -7,23 +7,32 @@ using Apolon.Core.DataAccess;
 using Apolon.Core.Mapping;
 using Apolon.Core.Mapping.Models;
 using Apolon.Core.Sql;
-using Npgsql;
 
 namespace Apolon.Core.DbSet;
 
 public class DbSet<T> : IEnumerable<T>
     where T : class
 {
-    private readonly IDbConnection _connection;
-    private readonly EntityMetadata _metadata = EntityMapper.GetMetadata(typeof(T));
-    private readonly List<T> _localCache = [];
-    private readonly EntityExecutor _executor;
     private readonly ChangeTracker _changeTracker = new();
+    private readonly IDbConnection _connection;
+    private readonly DatabaseExecutor _executor;
+    private readonly List<T> _localCache = [];
+    private readonly EntityMetadata _metadata = EntityMapper.GetMetadata(typeof(T));
 
     internal DbSet(IDbConnection connection)
     {
         _connection = connection;
-        _executor = new EntityExecutor(connection);
+        _executor = new DatabaseExecutor(connection);
+    }
+
+    public IEnumerator<T> GetEnumerator()
+    {
+        return _localCache.GetEnumerator();
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
     }
 
     // CREATE
@@ -77,7 +86,10 @@ public class DbSet<T> : IEnumerable<T>
         return _executor.QueryAsync(queryBuilder);
     }
 
-    public List<T> ToList() => _executor.Query(new QueryBuilder<T>());
+    public List<T> ToList()
+    {
+        return _executor.Query(new QueryBuilder<T>());
+    }
 
     public Task<List<T>> ToListAsync()
     {
@@ -119,10 +131,7 @@ public class DbSet<T> : IEnumerable<T>
     public void Update(T entity)
     {
         var index = _localCache.IndexOf(entity);
-        if (index >= 0)
-        {
-            _localCache[index] = entity;
-        }
+        if (index >= 0) _localCache[index] = entity;
 
         _changeTracker.TrackModified(entity);
     }
@@ -161,9 +170,6 @@ public class DbSet<T> : IEnumerable<T>
         _changeTracker.Clear();
         return affectedRows;
     }
-
-    public IEnumerator<T> GetEnumerator() => _localCache.GetEnumerator();
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     private static MemberExpression? GetMemberExpression(Expression<Func<T, object>> expression)
     {
@@ -205,7 +211,7 @@ public class DbSet<T> : IEnumerable<T>
         {
             while (reader.Read())
             {
-                var relatedEntity = EntityExecutor.MapEntity(reader, relatedMetadata);
+                var relatedEntity = EntityMapper.MapEntity(reader, relatedMetadata);
                 var foreignKeyValue = foreignKeyColumn.Property.GetValue(relatedEntity);
 
                 if (!relatedEntities.ContainsKey(foreignKeyValue))
@@ -225,10 +231,7 @@ public class DbSet<T> : IEnumerable<T>
             var collectionType = typeof(List<>).MakeGenericType(relatedType);
             var collection = Activator.CreateInstance(collectionType);
 
-            foreach (var item in related)
-            {
-                collectionType.GetMethod("Add")?.Invoke(collection, [item]);
-            }
+            foreach (var item in related) collectionType.GetMethod("Add")?.Invoke(collection, [item]);
 
             navigationProperty.SetValue(entity, collection);
         }
@@ -266,7 +269,7 @@ public class DbSet<T> : IEnumerable<T>
         {
             while (reader.Read())
             {
-                var relatedEntity = EntityExecutor.MapEntity(reader, relatedMetadata);
+                var relatedEntity = EntityMapper.MapEntity(reader, relatedMetadata);
                 var id = relatedMetadata.PrimaryKey.Property.GetValue(relatedEntity) ??
                          throw new Exception("Primary key is null");
                 relatedEntities[id] = relatedEntity;
@@ -278,9 +281,7 @@ public class DbSet<T> : IEnumerable<T>
             var foreignKeyValue = foreignKeyColumn.Property.GetValue(entity);
 
             if (foreignKeyValue != null && relatedEntities.TryGetValue(foreignKeyValue, out var related))
-            {
                 navigationProperty.SetValue(entity, related);
-            }
         }
     }
 

@@ -1,13 +1,13 @@
 namespace Apolon.Core.Migrations.Builders;
 
 /// <summary>
-/// Builder for defining columns within a CreateTable operation.
-/// Used in the columns lambda: table => new { Id = table.Column&lt;int&gt;(), ... }
+///     Builder for defining columns within a CreateTable operation.
+///     Used in the columns lambda: table => new { Id = table.Column&lt;int&gt;(), ... }
 /// </summary>
 public sealed class ColumnsBuilder
 {
     /// <summary>
-    /// Defines a column with the specified CLR type.
+    ///     Defines a column with the specified CLR type.
     /// </summary>
     /// <typeparam name="T">The CLR type of the column (e.g., int, string, DateTime).</typeparam>
     /// <param name="type">Optional explicit SQL type (e.g., "VARCHAR(255)", "INT").</param>

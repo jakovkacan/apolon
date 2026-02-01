@@ -21,6 +21,8 @@ public abstract class BaseEntity
         DefaultValue = "CURRENT_TIMESTAMP", DefaultIsRawSql = true)]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-    public override string ToString() =>
-        $"{nameof(Id)}: {Id}, {nameof(CreatedAt)}: {CreatedAt}, {nameof(UpdatedAt)}: {UpdatedAt}";
+    public override string ToString()
+    {
+        return $"{nameof(Id)}: {Id}, {nameof(CreatedAt)}: {CreatedAt}, {nameof(UpdatedAt)}: {UpdatedAt}";
+    }
 }

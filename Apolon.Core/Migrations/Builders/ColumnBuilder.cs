@@ -3,26 +3,26 @@ using Apolon.Core.Migrations.Models;
 namespace Apolon.Core.Migrations.Builders;
 
 /// <summary>
-/// Fluent builder for configuring a column definition.
+///     Fluent builder for configuring a column definition.
 /// </summary>
 /// <typeparam name="T">The CLR type of the column.</typeparam>
 public sealed class ColumnBuilder<T>
 {
-    private readonly string _name;
     private readonly Type _clrType;
-    private string? _sqlType;
-    private bool _isNullable = true;
-    private string? _defaultValueSql;
+    private readonly string _name;
+    private Dictionary<string, object>? _annotations;
+    private string? _comment;
     private object? _defaultValue;
+    private string? _defaultValueSql;
+    private string? _identityGeneration;
+    private bool _isIdentity;
+    private bool _isNullable = true;
+    private bool _isPrimaryKey;
+    private bool _isUnique;
     private int? _maxLength;
     private int? _precision;
     private int? _scale;
-    private bool _isPrimaryKey;
-    private bool _isIdentity;
-    private string? _identityGeneration;
-    private bool _isUnique;
-    private Dictionary<string, object>? _annotations;
-    private string? _comment;
+    private string? _sqlType;
 
     internal ColumnBuilder(string name)
     {
@@ -31,18 +31,13 @@ public sealed class ColumnBuilder<T>
 
         // For nullable value types, make column nullable by default
         if (Nullable.GetUnderlyingType(typeof(T)) != null)
-        {
             _isNullable = true;
-        }
         // For reference types, check nullability context (simplified - always nullable by default for strings)
-        else if (!typeof(T).IsValueType)
-        {
-            _isNullable = true;
-        }
+        else if (!typeof(T).IsValueType) _isNullable = true;
     }
 
     /// <summary>
-    /// Sets the SQL type explicitly (e.g., "VARCHAR(255)", "INT").
+    ///     Sets the SQL type explicitly (e.g., "VARCHAR(255)", "INT").
     /// </summary>
     public ColumnBuilder<T> HasColumnType(string sqlType)
     {
@@ -51,7 +46,7 @@ public sealed class ColumnBuilder<T>
     }
 
     /// <summary>
-    /// Sets whether the column is nullable.
+    ///     Sets whether the column is nullable.
     /// </summary>
     public ColumnBuilder<T> IsNullable(bool nullable = true)
     {
@@ -60,7 +55,7 @@ public sealed class ColumnBuilder<T>
     }
 
     /// <summary>
-    /// Sets whether the column is required (NOT NULL).
+    ///     Sets whether the column is required (NOT NULL).
     /// </summary>
     public ColumnBuilder<T> IsRequired()
     {
@@ -69,7 +64,7 @@ public sealed class ColumnBuilder<T>
     }
 
     /// <summary>
-    /// Sets a default value SQL expression (e.g., "CURRENT_TIMESTAMP", "0").
+    ///     Sets a default value SQL expression (e.g., "CURRENT_TIMESTAMP", "0").
     /// </summary>
     public ColumnBuilder<T> HasDefaultValueSql(string sql)
     {
@@ -78,7 +73,7 @@ public sealed class ColumnBuilder<T>
     }
 
     /// <summary>
-    /// Sets a default value from a CLR object (will be converted to SQL).
+    ///     Sets a default value from a CLR object (will be converted to SQL).
     /// </summary>
     public ColumnBuilder<T> HasDefaultValue(object value)
     {
@@ -87,7 +82,7 @@ public sealed class ColumnBuilder<T>
     }
 
     /// <summary>
-    /// Sets the maximum length for string/binary columns.
+    ///     Sets the maximum length for string/binary columns.
     /// </summary>
     public ColumnBuilder<T> HasMaxLength(int maxLength)
     {
@@ -96,7 +91,7 @@ public sealed class ColumnBuilder<T>
     }
 
     /// <summary>
-    /// Sets the precision for numeric/decimal columns.
+    ///     Sets the precision for numeric/decimal columns.
     /// </summary>
     public ColumnBuilder<T> HasPrecision(int precision, int? scale = null)
     {
@@ -106,7 +101,7 @@ public sealed class ColumnBuilder<T>
     }
 
     /// <summary>
-    /// Marks this column as part of the primary key.
+    ///     Marks this column as part of the primary key.
     /// </summary>
     public ColumnBuilder<T> IsPrimaryKey()
     {
@@ -115,7 +110,7 @@ public sealed class ColumnBuilder<T>
     }
 
     /// <summary>
-    /// Marks this column as an identity/auto-increment column.
+    ///     Marks this column as an identity/auto-increment column.
     /// </summary>
     public ColumnBuilder<T> IsIdentity(string generation = "ALWAYS")
     {
@@ -125,7 +120,7 @@ public sealed class ColumnBuilder<T>
     }
 
     /// <summary>
-    /// Marks this column as having a unique constraint.
+    ///     Marks this column as having a unique constraint.
     /// </summary>
     public ColumnBuilder<T> IsUnique()
     {
@@ -134,7 +129,7 @@ public sealed class ColumnBuilder<T>
     }
 
     /// <summary>
-    /// Adds a provider-specific annotation (e.g., "SqlServer:Identity", "1, 1").
+    ///     Adds a provider-specific annotation (e.g., "SqlServer:Identity", "1, 1").
     /// </summary>
     public ColumnBuilder<T> Annotation(string name, object value)
     {
@@ -144,7 +139,7 @@ public sealed class ColumnBuilder<T>
     }
 
     /// <summary>
-    /// Sets a comment/description for the column.
+    ///     Sets a comment/description for the column.
     /// </summary>
     public ColumnBuilder<T> HasComment(string comment)
     {
@@ -153,7 +148,7 @@ public sealed class ColumnBuilder<T>
     }
 
     /// <summary>
-    /// Builds the final ColumnDefinition.
+    ///     Builds the final ColumnDefinition.
     /// </summary>
     internal ColumnDefinition Build(string name)
     {

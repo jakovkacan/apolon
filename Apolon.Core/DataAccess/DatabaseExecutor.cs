@@ -1,12 +1,11 @@
 using System.Data.Common;
 using Apolon.Core.Exceptions;
 using Apolon.Core.Mapping;
-using Apolon.Core.Mapping.Models;
 using Apolon.Core.Sql;
 
 namespace Apolon.Core.DataAccess;
 
-internal class EntityExecutor(IDbConnection connection)
+internal class DatabaseExecutor(IDbConnection connection)
 {
     public int Insert<T>(T entity) where T : class
     {
@@ -92,10 +91,7 @@ internal class EntityExecutor(IDbConnection connection)
             using var reader = connection.ExecuteReader(command);
             var metadata = EntityMapper.GetMetadata(typeof(T));
 
-            while (reader.Read())
-            {
-                result.Add(MapEntity<T>(reader, metadata));
-            }
+            while (reader.Read()) result.Add(EntityMapper.MapEntity<T>(reader, metadata));
         }
         catch (DbException ex)
         {
@@ -117,10 +113,7 @@ internal class EntityExecutor(IDbConnection connection)
             await using var reader = await connection.ExecuteReaderAsync(command);
             var metadata = EntityMapper.GetMetadata(typeof(T));
 
-            while (await reader.ReadAsync())
-            {
-                result.Add(MapEntity<T>(reader, metadata));
-            }
+            while (await reader.ReadAsync()) result.Add(EntityMapper.MapEntity<T>(reader, metadata));
         }
         catch (DbException ex)
         {
@@ -132,32 +125,22 @@ internal class EntityExecutor(IDbConnection connection)
         return result;
     }
 
-    public static T MapEntity<T>(DbDataReader reader, EntityMetadata metadata) where T : class
+    public async Task ExecuteSqlAsync(List<string> sqlBatch, CancellationToken ct = default)
     {
-        var entity = Activator.CreateInstance<T>();
-        foreach (var column in metadata.Columns)
+        if (sqlBatch.Count == 0)
+            return;
+
+        await connection.BeginTransactionAsync(ct);
+        try
         {
-            var ordinal = reader.GetOrdinal(column.ColumnName);
-            var value = reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);
-            column.Property.SetValue(entity, TypeMapper.ConvertFromDb(value, column.Property.PropertyType));
+            foreach (var sql in sqlBatch)
+                await connection.ExecuteNonQueryAsync(connection.CreateCommand(sql));
+            await connection.CommitTransactionAsync(ct);
         }
-
-        return entity;
-    }
-
-    public static object MapEntity(DbDataReader reader, EntityMetadata metadata)
-    {
-        var entity = Activator.CreateInstance(metadata.EntityType)
-                     ?? throw new InvalidOperationException($"Could not create instance of {metadata.EntityType.Name}");
-
-        foreach (var column in metadata.Columns)
+        catch
         {
-            var ordinal = reader.GetOrdinal(column.ColumnName);
-            var value = reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);
-            var convertedValue = TypeMapper.ConvertFromDb(value, column.Property.PropertyType);
-            column.Property.SetValue(entity, convertedValue);
+            await connection.RollbackTransactionAsync(ct);
+            throw;
         }
-
-        return entity;
     }
 }

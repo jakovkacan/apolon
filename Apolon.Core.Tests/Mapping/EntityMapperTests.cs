@@ -2,7 +2,6 @@
 using Apolon.Core.Exceptions;
 using Apolon.Core.Mapping;
 using Apolon.Core.Mapping.Models;
-using Xunit;
 
 namespace Apolon.Core.Tests.Mapping;
 
@@ -405,7 +404,8 @@ public class EntityWithUniqueColumn
 {
     [PrimaryKey] public int Id { get; set; }
 
-    [Column("email", IsUnique = true)] public string Email { get; set; } = string.Empty;
+    [Unique]
+    [Column("email")] public string Email { get; set; } = string.Empty;
 }
 
 [Table("custom_db_type", Schema = "public")]

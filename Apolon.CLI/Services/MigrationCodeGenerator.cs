@@ -5,7 +5,7 @@ using Apolon.Core.Migrations.Models;
 namespace Apolon.CLI.Services;
 
 /// <summary>
-/// Generates migration code using the new fluent builder pattern API.
+///     Generates migration code using the new fluent builder pattern API.
 /// </summary>
 internal static class MigrationCodeGenerator
 {
@@ -27,14 +27,14 @@ internal static class MigrationCodeGenerator
         // Generate Up() method
         sb.AppendLine("    public override void Up(MigrationBuilder migrationBuilder)");
         sb.AppendLine("    {");
-        GenerateFluentOperations(sb, operations, indent: "        ");
+        GenerateFluentOperations(sb, operations, "        ");
         sb.AppendLine("    }");
         sb.AppendLine();
 
         // Generate Down() method
         sb.AppendLine("    public override void Down(MigrationBuilder migrationBuilder)");
         sb.AppendLine("    {");
-        GenerateReverseOperations(sb, operations, allCommittedOperations ?? [], indent: "        ");
+        GenerateReverseOperations(sb, operations, allCommittedOperations ?? [], "        ");
         sb.AppendLine("    }");
         sb.AppendLine("}");
 
@@ -50,7 +50,6 @@ internal static class MigrationCodeGenerator
         var tableGroups = GroupOperationsByTable(operations);
 
         foreach (var group in tableGroups)
-        {
             switch (group.Type)
             {
                 case TableOperationType.CreateTable:
@@ -70,7 +69,6 @@ internal static class MigrationCodeGenerator
                     GenerateOtherOperations(sb, group.Operations, indent);
                     break;
             }
-        }
     }
 
     private static void GenerateCreateTableFluent(
@@ -94,7 +92,7 @@ internal static class MigrationCodeGenerator
         sb.AppendLine($"{indent}    columns: table => new");
         sb.AppendLine($"{indent}    {{");
 
-        for (int i = 0; i < columnOps.Count; i++)
+        for (var i = 0; i < columnOps.Count; i++)
         {
             var colOp = columnOps[i];
             var isLast = i == columnOps.Count - 1;
@@ -105,10 +103,7 @@ internal static class MigrationCodeGenerator
         sb.AppendLine($"{indent}    }},");
 
         // Schema parameter (if not public)
-        if (createOp.Schema != "public")
-        {
-            sb.AppendLine($"{indent}    schema: \"{createOp.Schema}\",");
-        }
+        if (createOp.Schema != "public") sb.AppendLine($"{indent}    schema: \"{createOp.Schema}\",");
 
         // Constraints lambda (if there's a PK, FKs, or Unique constraints)
         if (pkColumn != null || fkOps.Any() || uniqueOps.Any())
@@ -118,17 +113,13 @@ internal static class MigrationCodeGenerator
 
             // Primary key
             if (pkColumn != null)
-            {
                 sb.AppendLine(
                     $"{indent}        table.PrimaryKey(\"{createOp.Table}_pkey\", x => x.{pkColumn.Column});");
-            }
 
             // Unique constraints
             foreach (var unique in uniqueOps)
-            {
                 sb.AppendLine(
                     $"{indent}        table.UniqueConstraint(\"{createOp.Table}_{unique.Column}_key\", x => x.{unique.Column});");
-            }
 
             // Foreign keys
             foreach (var fk in fkOps)
@@ -201,16 +192,11 @@ internal static class MigrationCodeGenerator
 
         // Default value
         if (!string.IsNullOrWhiteSpace(colOp.DefaultSql))
-        {
             fluentMethods.Add($".HasDefaultValueSql(\"{EscapeString(colOp.DefaultSql)}\")");
-        }
 
         // Max length (if VARCHAR with length)
         var maxLength = ExtractMaxLength(colOp.GetSqlType());
-        if (maxLength.HasValue)
-        {
-            fluentMethods.Add($".HasMaxLength({maxLength.Value})");
-        }
+        if (maxLength.HasValue) fluentMethods.Add($".HasMaxLength({maxLength.Value})");
 
         // Precision/Scale (if NUMERIC)
         var (precision, scale) = ExtractPrecisionScale(colOp);
@@ -223,10 +209,7 @@ internal static class MigrationCodeGenerator
         }
 
         // Unique constraint (marked via isUnique parameter)
-        if (isUnique)
-        {
-            fluentMethods.Add(".IsUnique()");
-        }
+        if (isUnique) fluentMethods.Add(".IsUnique()");
 
         foreach (var method in fluentMethods)
         {
@@ -244,7 +227,6 @@ internal static class MigrationCodeGenerator
         string indent)
     {
         foreach (var op in operations)
-        {
             switch (op.Type)
             {
                 case MigrationOperationType.AddColumn:
@@ -292,7 +274,6 @@ internal static class MigrationCodeGenerator
                     sb.AppendLine(fkCall);
                     break;
             }
-        }
     }
 
     private static void GenerateOtherOperations(
@@ -303,12 +284,8 @@ internal static class MigrationCodeGenerator
         var createdSchemas = new HashSet<string>();
 
         foreach (var op in operations)
-        {
             if (op.Type == MigrationOperationType.CreateSchema && createdSchemas.Add(op.Schema))
-            {
                 sb.AppendLine($"{indent}migrationBuilder.CreateSchema(\"{op.Schema}\");");
-            }
-        }
     }
 
     private static void GenerateReverseOperations(
@@ -326,13 +303,11 @@ internal static class MigrationCodeGenerator
         var tableDefinitions = BuildTableDefinitionsFromCommittedOperations(allCommittedOperations);
 
         foreach (var op in reversedOps)
-        {
             switch (op.Type)
             {
                 // case MigrationOperationType.CreateSchema:
                 //     sb.AppendLine($"{indent}migrationBuilder.DropSchema(\"{op.Schema}\");");
                 //     break;
-
                 case MigrationOperationType.CreateTable:
                     sb.AppendLine($"{indent}migrationBuilder.DropTable(\"{op.Schema}\", \"{op.Table}\");");
                     break;
@@ -341,15 +316,11 @@ internal static class MigrationCodeGenerator
                     // Try to recreate the table from committed operations
                     var tableKey = (op.Schema, op.Table);
                     if (tableDefinitions.TryGetValue(tableKey, out var tableDef))
-                    {
                         // Recreate the table using fluent API
                         GenerateCreateTableFluent(sb, tableDef, indent);
-                    }
                     else
-                    {
                         sb.AppendLine(
                             $"{indent}// TODO: Recreate table \"{op.Schema}.{op.Table}\" - structure not available in committed migrations");
-                    }
 
                     break;
 
@@ -396,15 +367,11 @@ internal static class MigrationCodeGenerator
                         var originalColumnOp =
                             FindOriginalColumnOperation(tableDefinitions, op.Schema, op.Table, op.Column!);
                         if (originalColumnOp != null && !string.IsNullOrWhiteSpace(originalColumnOp.GetSqlType()))
-                        {
                             sb.AppendLine(
                                 $"{indent}migrationBuilder.AlterColumnType(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\", \"{originalColumnOp.GetSqlType()}\");");
-                        }
                         else
-                        {
                             sb.AppendLine(
                                 $"{indent}// TODO: Revert column type for \"{op.Schema}.{op.Table}.{op.Column}\" - old type not available");
-                        }
                     }
 
                     break;
@@ -416,15 +383,11 @@ internal static class MigrationCodeGenerator
                         var originalColumnOp =
                             FindOriginalColumnOperation(tableDefinitions, op.Schema, op.Table, op.Column!);
                         if (originalColumnOp != null && originalColumnOp.IsNullable.HasValue)
-                        {
                             sb.AppendLine(
                                 $"{indent}migrationBuilder.AlterNullability(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\", {(originalColumnOp.IsNullable.Value ? "true" : "false")});");
-                        }
                         else
-                        {
                             sb.AppendLine(
                                 $"{indent}// TODO: Revert nullability for \"{op.Schema}.{op.Table}.{op.Column}\" - old nullability not available");
-                        }
                     }
 
                     break;
@@ -436,61 +399,46 @@ internal static class MigrationCodeGenerator
                         var originalColumnOp =
                             FindOriginalColumnOperation(tableDefinitions, op.Schema, op.Table, op.Column!);
                         if (originalColumnOp != null && !string.IsNullOrWhiteSpace(originalColumnOp.DefaultSql))
-                        {
                             sb.AppendLine(
                                 $"{indent}migrationBuilder.SetDefault(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\", \"{EscapeString(originalColumnOp.DefaultSql)}\");");
-                        }
                         else
-                        {
                             sb.AppendLine(
                                 $"{indent}migrationBuilder.DropDefault(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\");");
-                        }
                     }
 
                     break;
 
                 case MigrationOperationType.DropDefault:
                     if (!droppedTables.Contains((op.Schema, op.Table)) && !string.IsNullOrWhiteSpace(op.DefaultSql))
-                    {
                         sb.AppendLine(
                             $"{indent}migrationBuilder.SetDefault(\"{op.Schema}\", \"{op.Table}\", \"{op.Column}\", \"{EscapeString(op.DefaultSql)}\");");
-                    }
                     else if (!droppedTables.Contains((op.Schema, op.Table)))
-                    {
                         sb.AppendLine(
                             $"{indent}// TODO: Restore default for \"{op.Schema}.{op.Table}.{op.Column}\" - default value not available");
-                    }
 
                     break;
 
                 case MigrationOperationType.AddUnique:
                     if (!droppedTables.Contains((op.Schema, op.Table)) && !string.IsNullOrWhiteSpace(op.ConstraintName))
-                    {
                         sb.AppendLine(
                             $"{indent}migrationBuilder.DropConstraint(\"{op.Schema}\", \"{op.Table}\", \"{op.ConstraintName}\");");
-                    }
 
                     break;
 
                 case MigrationOperationType.AddForeignKey:
                     if (!droppedTables.Contains((op.Schema, op.Table)) && !string.IsNullOrWhiteSpace(op.ConstraintName))
-                    {
                         sb.AppendLine(
                             $"{indent}migrationBuilder.DropConstraint(\"{op.Schema}\", \"{op.Table}\", \"{op.ConstraintName}\");");
-                    }
 
                     break;
 
                 case MigrationOperationType.DropConstraint:
                     if (!droppedTables.Contains((op.Schema, op.Table)))
-                    {
                         sb.AppendLine(
                             $"{indent}// TODO: Recreate constraint \"{op.ConstraintName}\" on \"{op.Schema}.{op.Table}\" - constraint definition not available");
-                    }
 
                     break;
             }
-        }
     }
 
     private static List<TableOperationGroup> GroupOperationsByTable(IReadOnlyList<MigrationOperation> operations)
@@ -501,13 +449,11 @@ internal static class MigrationCodeGenerator
         // Separate CreateSchema operations
         var schemaOps = operations.Where(op => op.Type == MigrationOperationType.CreateSchema).ToList();
         if (schemaOps.Count != 0)
-        {
             groups.Add(new TableOperationGroup
             {
                 Type = TableOperationType.Other,
                 Operations = schemaOps
             });
-        }
 
         // Group table operations
         foreach (var op in operations)
@@ -529,7 +475,6 @@ internal static class MigrationCodeGenerator
             var hasDropTable = ops.Any(op => op.Type == MigrationOperationType.DropTable);
 
             if (hasCreateTable)
-            {
                 groups.Add(new TableOperationGroup
                 {
                     Type = TableOperationType.CreateTable,
@@ -537,9 +482,7 @@ internal static class MigrationCodeGenerator
                     Table = key.Table,
                     Operations = ops
                 });
-            }
             else if (hasDropTable)
-            {
                 groups.Add(new TableOperationGroup
                 {
                     Type = TableOperationType.DropTable,
@@ -547,9 +490,7 @@ internal static class MigrationCodeGenerator
                     Table = key.Table,
                     Operations = ops
                 });
-            }
             else
-            {
                 groups.Add(new TableOperationGroup
                 {
                     Type = TableOperationType.AlterTable,
@@ -557,7 +498,6 @@ internal static class MigrationCodeGenerator
                     Table = key.Table,
                     Operations = ops
                 });
-            }
         }
 
         return groups;
@@ -661,8 +601,8 @@ internal static class MigrationCodeGenerator
     }
 
     /// <summary>
-    /// Finds the original column operation from committed operations.
-    /// Used to retrieve the original state of a column before alterations.
+    ///     Finds the original column operation from committed operations.
+    ///     Used to retrieve the original state of a column before alterations.
     /// </summary>
     private static MigrationOperation? FindOriginalColumnOperation(
         Dictionary<(string Schema, string Table), TableOperationGroup> tableDefinitions,
@@ -680,8 +620,8 @@ internal static class MigrationCodeGenerator
     }
 
     /// <summary>
-    /// Builds table definitions from all committed operations, grouping operations by table.
-    /// This allows us to reconstruct the full table structure for rollback operations.
+    ///     Builds table definitions from all committed operations, grouping operations by table.
+    ///     This allows us to reconstruct the full table structure for rollback operations.
     /// </summary>
     private static Dictionary<(string Schema, string Table), TableOperationGroup>
         BuildTableDefinitionsFromCommittedOperations(
@@ -712,7 +652,6 @@ internal static class MigrationCodeGenerator
 
             // Only include tables that have been created (not just altered)
             if (hasCreateTable)
-            {
                 tableDefinitions[key] = new TableOperationGroup
                 {
                     Type = TableOperationType.CreateTable,
@@ -720,7 +659,6 @@ internal static class MigrationCodeGenerator
                     Table = key.Table,
                     Operations = ops
                 };
-            }
         }
 
         return tableDefinitions;

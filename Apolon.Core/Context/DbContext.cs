@@ -1,4 +1,5 @@
-﻿using Apolon.Core.DataAccess;
+﻿using System.Reflection;
+using Apolon.Core.DataAccess;
 using Apolon.Core.DbSet;
 
 namespace Apolon.Core.Context;
@@ -9,22 +10,13 @@ public abstract class DbContext : IDisposable
     private readonly Dictionary<Type, object> _dbSets = new();
     private DatabaseFacade? _database;
     private bool _disposed;
-    
 
-    protected DbContext(string connectionString, bool openConnection = true)
+
+    protected DbContext(string connectionString)
     {
         _connection = new DbConnectionNpgsql(connectionString);
         _connection.OpenConnection();
         _disposed = false;
-    }
-    
-    protected static async Task<T> CreateAsync<T>(string connectionString) where T : DbContext
-    {
-        var context = (T)Activator.CreateInstance(typeof(T), 
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, 
-            null, [connectionString], null)!;
-        context._database = await DatabaseFacade.CreateAsync(context._connection);
-        return context;
     }
 
     public virtual DatabaseFacade Database
@@ -32,8 +24,26 @@ public abstract class DbContext : IDisposable
         get
         {
             CheckDisposed();
-            return _database ?? throw new InvalidOperationException("Database not initialized. Use CreateAsync.");;
+            return _database ?? throw new InvalidOperationException("Database not initialized. Use CreateAsync.");
         }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+
+        _disposed = true;
+        _connection?.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    protected static T Create<T>(string connectionString) where T : DbContext
+    {
+        var context = (T)Activator.CreateInstance(typeof(T),
+            BindingFlags.NonPublic | BindingFlags.Instance,
+            null, [connectionString], null)!;
+        context._database = new DatabaseFacade(context._connection);
+        return context;
     }
 
     // Generic DbSet accessor
@@ -67,28 +77,22 @@ public abstract class DbContext : IDisposable
 
         return total;
     }
-    
-    public virtual Task<int> SaveChangesAsync() => Task.FromResult(SaveChanges());
-    
+
+    public virtual Task<int> SaveChangesAsync()
+    {
+        return Task.FromResult(SaveChanges());
+    }
+
     private void CheckDisposed()
     {
         if (!_disposed) return;
         throw new ObjectDisposedException(nameof(DbContext));
     }
 
-    public void Dispose()
-    {
-        if (_disposed) return;
-        
-        _disposed = true;
-        _connection?.Dispose();
-        GC.SuppressFinalize(this);
-    }
-    
     public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
-        
+
         _disposed = true;
         await _connection.DisposeAsync();
     }

@@ -1,21 +1,12 @@
 ﻿namespace Apolon.Core.Migrations.Models;
 
 /// <summary>
-/// Internal snapshot model used for schema diffing. Use DatabaseSchema for public APIs.
+///     Internal snapshot model used for schema diffing. Use DatabaseSchema for public APIs.
 /// </summary>
 internal sealed record SchemaSnapshot(
     IReadOnlyList<TableSnapshot> Tables
 )
 {
-    public override string ToString()
-    {
-        var tablesText = Tables.Count == 0
-            ? "(none)"
-            : string.Join(Environment.NewLine, Tables.Select(t => t.ToString()));
-
-        return $"Tables:{Environment.NewLine}{tablesText}";
-    }
-
     public bool Equals(SchemaSnapshot? other)
     {
         if (other is null) return false;
@@ -26,6 +17,15 @@ internal sealed record SchemaSnapshot(
         var b = other.Tables.OrderBy(t => t.Schema).ThenBy(t => t.Name).ToArray();
 
         return a.SequenceEqual(b);
+    }
+
+    public override string ToString()
+    {
+        var tablesText = Tables.Count == 0
+            ? "(none)"
+            : string.Join(Environment.NewLine, Tables.Select(t => t.ToString()));
+
+        return $"Tables:{Environment.NewLine}{tablesText}";
     }
 
     public override int GetHashCode()
@@ -39,7 +39,7 @@ internal sealed record SchemaSnapshot(
 }
 
 /// <summary>
-/// Internal snapshot model used for schema diffing. Use TableSchema for public APIs.
+///     Internal snapshot model used for schema diffing. Use TableSchema for public APIs.
 /// </summary>
 internal sealed record TableSnapshot(
     string Schema,
@@ -83,7 +83,7 @@ internal sealed record TableSnapshot(
 }
 
 /// <summary>
-/// Internal snapshot model used for schema diffing. Use ColumnSchema for public APIs.
+///     Internal snapshot model used for schema diffing. Use ColumnSchema for public APIs.
 /// </summary>
 internal sealed record ColumnSnapshot(
     // identity
@@ -123,6 +123,24 @@ internal sealed record ColumnSnapshot(
     string? FkDeleteRule
 )
 {
+    public bool Equals(ColumnSnapshot? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+        return ColumnName == other.ColumnName && DataType == other.DataType && UdtName == other.UdtName &&
+               CharacterMaximumLength == other.CharacterMaximumLength && NumericPrecision == other.NumericPrecision &&
+               NumericScale == other.NumericScale && DateTimePrecision == other.DateTimePrecision &&
+               IsNullable == other.IsNullable && ColumnDefault == other.ColumnDefault &&
+               IsIdentity == other.IsIdentity && IdentityGeneration == other.IdentityGeneration &&
+               IsGenerated == other.IsGenerated && GenerationExpression == other.GenerationExpression &&
+               IsPrimaryKey == other.IsPrimaryKey && PkConstraintName == other.PkConstraintName &&
+               IsUnique == other.IsUnique && UniqueConstraintName == other.UniqueConstraintName &&
+               IsForeignKey == other.IsForeignKey && FkConstraintName == other.FkConstraintName &&
+               ReferencesSchema == other.ReferencesSchema && ReferencesTable == other.ReferencesTable &&
+               ReferencesColumn == other.ReferencesColumn && FkUpdateRule == other.FkUpdateRule &&
+               FkDeleteRule == other.FkDeleteRule;
+    }
+
     public override string ToString()
     {
         var defaultText = ColumnDefault is null ? "" : $" DEFAULT {ColumnDefault}";
@@ -144,30 +162,12 @@ internal sealed record ColumnSnapshot(
         var genText = IsGenerated ? $" GENERATED({GenerationExpression ?? "?"})" : "";
 
         var fkText = IsForeignKey
-            ? $" FK({FkConstraintName ?? "?"}) -> {(ReferencesSchema ?? "?")}.{(ReferencesTable ?? "?")}.{(ReferencesColumn ?? "?")} " +
-              $"ON UPDATE {(FkUpdateRule ?? "?")} ON DELETE {(FkDeleteRule ?? "?")}"
+            ? $" FK({FkConstraintName ?? "?"}) -> {ReferencesSchema ?? "?"}.{ReferencesTable ?? "?"}.{ReferencesColumn ?? "?"} " +
+              $"ON UPDATE {FkUpdateRule ?? "?"} ON DELETE {FkDeleteRule ?? "?"}"
             : "";
 
         return
             $"{ColumnName} {typeText}{(IsNullable ? " NULL" : " NOT NULL")}{defaultText}{identityText}{genText}{pkText}{uqText}{fkText}";
-    }
-
-    public bool Equals(ColumnSnapshot? other)
-    {
-        if (other is null) return false;
-        if (ReferenceEquals(this, other)) return true;
-        return ColumnName == other.ColumnName && DataType == other.DataType && UdtName == other.UdtName &&
-               CharacterMaximumLength == other.CharacterMaximumLength && NumericPrecision == other.NumericPrecision &&
-               NumericScale == other.NumericScale && DateTimePrecision == other.DateTimePrecision &&
-               IsNullable == other.IsNullable && ColumnDefault == other.ColumnDefault &&
-               IsIdentity == other.IsIdentity && IdentityGeneration == other.IdentityGeneration &&
-               IsGenerated == other.IsGenerated && GenerationExpression == other.GenerationExpression &&
-               IsPrimaryKey == other.IsPrimaryKey && PkConstraintName == other.PkConstraintName &&
-               IsUnique == other.IsUnique && UniqueConstraintName == other.UniqueConstraintName &&
-               IsForeignKey == other.IsForeignKey && FkConstraintName == other.FkConstraintName &&
-               ReferencesSchema == other.ReferencesSchema && ReferencesTable == other.ReferencesTable &&
-               ReferencesColumn == other.ReferencesColumn && FkUpdateRule == other.FkUpdateRule &&
-               FkDeleteRule == other.FkDeleteRule;
     }
 
     public override int GetHashCode()

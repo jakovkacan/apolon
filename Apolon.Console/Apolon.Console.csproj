@@ -8,8 +8,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Apolon.Core\Apolon.Core.csproj" />
-      <ProjectReference Include="..\Apolon.Models\Apolon.Models.csproj" />
+        <ProjectReference Include="..\Apolon.Core\Apolon.Core.csproj"/>
+        <ProjectReference Include="..\Apolon.Models\Apolon.Models.csproj"/>
     </ItemGroup>
 
 </Project>

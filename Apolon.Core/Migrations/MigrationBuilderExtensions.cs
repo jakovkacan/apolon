@@ -5,12 +5,12 @@ using Apolon.Core.Migrations.Models;
 namespace Apolon.Core.Migrations;
 
 /// <summary>
-/// Extension methods for MigrationBuilder providing EntityFramework-like fluent API.
+///     Extension methods for MigrationBuilder providing EntityFramework-like fluent API.
 /// </summary>
 public static class MigrationBuilderExtensions
 {
     /// <summary>
-    /// Creates a table using fluent API syntax similar to EntityFramework.
+    ///     Creates a table using fluent API syntax similar to EntityFramework.
     /// </summary>
     /// <typeparam name="TColumns">Anonymous type representing the columns structure.</typeparam>
     /// <param name="migrationBuilder">The migration builder.</param>
@@ -60,7 +60,7 @@ public static class MigrationBuilderExtensions
     }
 
     /// <summary>
-    /// Extracts column definitions from the anonymous type returned by the columns lambda.
+    ///     Extracts column definitions from the anonymous type returned by the columns lambda.
     /// </summary>
     private static List<ColumnDefinition> ExtractColumnDefinitions(object columnsObject)
     {
@@ -90,17 +90,14 @@ public static class MigrationBuilderExtensions
                 continue;
 
             var columnDef = (ColumnDefinition?)buildMethod.Invoke(value, [prop.Name]);
-            if (columnDef != null)
-            {
-                columnDefinitions.Add(columnDef);
-            }
+            if (columnDef != null) columnDefinitions.Add(columnDef);
         }
 
         return columnDefinitions;
     }
 
     /// <summary>
-    /// Converts a TableDefinition to legacy MigrationOperations for backward compatibility.
+    ///     Converts a TableDefinition to legacy MigrationOperations for backward compatibility.
     /// </summary>
     private static void ConvertToMigrationOperations(
         MigrationBuilder migrationBuilder,
@@ -121,45 +118,39 @@ public static class MigrationBuilderExtensions
             var isPk = column.IsPrimaryKey || pkColumns.Contains(column.Name);
 
             migrationBuilder.AddColumn(
-                schema: tableDefinition.Schema,
-                table: tableDefinition.Name,
-                column: column.Name,
-                sqlType: sqlType,
-                isNullable: column.IsNullable,
-                defaultSql: column.DefaultValueSql ?? ConvertDefaultValue(column.DefaultValue),
-                isPrimaryKey: isPk,
-                isIdentity: column.IsIdentity,
-                identityGeneration: column.IdentityGeneration
+                tableDefinition.Schema,
+                tableDefinition.Name,
+                column.Name,
+                sqlType,
+                column.IsNullable,
+                column.DefaultValueSql ?? ConvertDefaultValue(column.DefaultValue),
+                isPk,
+                column.IsIdentity,
+                column.IdentityGeneration
             );
 
             // Add unique constraint if column is unique (but not PK)
             if (column.IsUnique && !isPk)
-            {
                 migrationBuilder.AddUnique(tableDefinition.Schema, tableDefinition.Name, column.Name);
-            }
         }
 
         // Add foreign keys
         foreach (var fk in tableDefinition.ForeignKeys)
-        {
             if (fk.Columns.Count == 1 && fk.PrincipalColumns.Count == 1)
-            {
                 migrationBuilder.AddForeignKey(
-                    schema: tableDefinition.Schema,
-                    table: tableDefinition.Name,
-                    column: fk.Columns[0],
-                    constraintName: fk.Name,
-                    refSchema: fk.PrincipalSchema ?? "public",
-                    refTable: fk.PrincipalTable,
-                    refColumn: fk.PrincipalColumns[0],
-                    onDeleteRule: fk.OnDelete
+                    tableDefinition.Schema,
+                    tableDefinition.Name,
+                    fk.Columns[0],
+                    fk.Name,
+                    fk.PrincipalSchema ?? "public",
+                    fk.PrincipalTable,
+                    fk.PrincipalColumns[0],
+                    fk.OnDelete
                 );
-            }
-        }
     }
 
     /// <summary>
-    /// Builds the SQL type string from a column definition.
+    ///     Builds the SQL type string from a column definition.
     /// </summary>
     private static string BuildSqlType(ColumnDefinition column)
     {
@@ -176,17 +167,15 @@ public static class MigrationBuilderExtensions
             return $"{baseType}({column.MaxLength.Value})";
 
         if (column.Precision.HasValue && IsNumericType(baseType))
-        {
             return column.Scale.HasValue
                 ? $"{baseType}({column.Precision.Value},{column.Scale.Value})"
                 : $"{baseType}({column.Precision.Value})";
-        }
 
         return baseType;
     }
 
     /// <summary>
-    /// Infers SQL type from CLR type.
+    ///     Infers SQL type from CLR type.
     /// </summary>
     private static string InferSqlType(Type clrType)
     {
@@ -203,15 +192,15 @@ public static class MigrationBuilderExtensions
             TypeCode.String => "TEXT",
             TypeCode.DateTime => "TIMESTAMP",
             _ => clrType == typeof(Guid) ? "UUID" :
-                 clrType == typeof(byte[]) ? "BYTEA" :
-                 clrType == typeof(DateTimeOffset) ? "TIMESTAMPTZ" :
-                 clrType == typeof(TimeSpan) ? "INTERVAL" :
-                 "TEXT"
+                clrType == typeof(byte[]) ? "BYTEA" :
+                clrType == typeof(DateTimeOffset) ? "TIMESTAMPTZ" :
+                clrType == typeof(TimeSpan) ? "INTERVAL" :
+                "TEXT"
         };
     }
 
     /// <summary>
-    /// Checks if the type supports length modifier.
+    ///     Checks if the type supports length modifier.
     /// </summary>
     private static bool IsLengthType(string baseType)
     {
@@ -221,7 +210,7 @@ public static class MigrationBuilderExtensions
     }
 
     /// <summary>
-    /// Checks if the type supports numeric precision/scale.
+    ///     Checks if the type supports numeric precision/scale.
     /// </summary>
     private static bool IsNumericType(string baseType)
     {
@@ -230,7 +219,7 @@ public static class MigrationBuilderExtensions
     }
 
     /// <summary>
-    /// Converts a CLR default value to SQL expression.
+    ///     Converts a CLR default value to SQL expression.
     /// </summary>
     private static string? ConvertDefaultValue(object? value)
     {

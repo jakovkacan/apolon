@@ -19,7 +19,7 @@ internal static class SourceFileParser
         foreach (var file in csFiles)
         {
             var content = File.ReadAllText(file);
-            
+
             // Check if file has [Table] attribute
             if (!Regex.IsMatch(content, @"\[Table[(\[]"))
                 continue;
@@ -28,7 +28,7 @@ internal static class SourceFileParser
             var namespaceMatch = Regex.Match(content, @"namespace\s+([\w\.]+)\s*;");
             if (!namespaceMatch.Success)
                 namespaceMatch = Regex.Match(content, @"namespace\s+([\w\.]+)\s*\{");
-            
+
             var namespaceName = namespaceMatch.Success ? namespaceMatch.Groups[1].Value : "Models";
 
             // Extract class name (public class ClassName)
@@ -40,6 +40,8 @@ internal static class SourceFileParser
             entities.Add((className, namespaceName));
         }
 
-        return entities.Count == 0 ? throw new InvalidOperationException($"No entity classes with [Table] attribute found in: {directoryPath}") : entities.ToArray();
+        return entities.Count == 0
+            ? throw new InvalidOperationException($"No entity classes with [Table] attribute found in: {directoryPath}")
+            : entities.ToArray();
     }
 }

@@ -25,17 +25,11 @@ internal static class DbContextGenerator
         var entities = SourceFileParser.DiscoverEntityClassesFromSource(modelsPath);
 
         Console.WriteLine($"\nFound {entities.Length} entity classes:");
-        foreach (var (className, ns) in entities)
-        {
-            Console.WriteLine($"  - {className} ({ns})");
-        }
+        foreach (var (className, ns) in entities) Console.WriteLine($"  - {className} ({ns})");
 
         // Determine output path (default to models directory)
         var finalOutputPath = outputPath ?? modelsPath;
-        if (!Directory.Exists(finalOutputPath))
-        {
-            Directory.CreateDirectory(finalOutputPath);
-        }
+        if (!Directory.Exists(finalOutputPath)) Directory.CreateDirectory(finalOutputPath);
 
         // Determine namespace (infer from directory if not specified)
         var finalNamespace = namespaceName ?? InferNamespace(finalOutputPath);
@@ -100,10 +94,7 @@ internal static class DbContextGenerator
             if (word.Length <= 0) continue;
 
             sb.Append(char.ToUpper(word[0]));
-            if (word.Length > 1)
-            {
-                sb.Append(word[1..].ToLower());
-            }
+            if (word.Length > 1) sb.Append(word[1..].ToLower());
         }
 
         return sb.ToString();
@@ -135,10 +126,7 @@ internal static class DbContextGenerator
         sb.AppendLine("using Apolon.Core.DbSet;");
 
         // Add models namespace if different
-        if (modelsNamespace != namespaceName)
-        {
-            sb.AppendLine($"using {modelsNamespace};");
-        }
+        if (modelsNamespace != namespaceName) sb.AppendLine($"using {modelsNamespace};");
 
         sb.AppendLine();
         sb.AppendLine($"namespace {namespaceName};");
@@ -154,18 +142,18 @@ internal static class DbContextGenerator
         sb.AppendLine("    }");
         sb.AppendLine();
 
-        // CreateAsync method with embedded connection string
-        sb.AppendLine($"    public static Task<{className}> CreateAsync()");
+        // Create method with embedded connection string
+        sb.AppendLine($"    public static {className} Create()");
         sb.AppendLine("    {");
         sb.AppendLine($"        const string connectionString = \"{EscapeConnectionString(connectionString)}\";");
-        sb.AppendLine($"        return CreateAsync<{className}>(connectionString);");
+        sb.AppendLine($"        return Create<{className}>(connectionString);");
         sb.AppendLine("    }");
         sb.AppendLine();
 
         // Overload for custom connection string
-        sb.AppendLine($"    public static Task<{className}> CreateAsync(string connectionString)");
+        sb.AppendLine($"    public static {className} Create(string connectionString)");
         sb.AppendLine("    {");
-        sb.AppendLine($"        return CreateAsync<{className}>(connectionString);");
+        sb.AppendLine($"        return Create<{className}>(connectionString);");
         sb.AppendLine("    }");
 
         // DbSet properties for each entity
@@ -194,24 +182,13 @@ internal static class DbContextGenerator
         // Simple pluralization rules
         if (word.EndsWith('s') || word.EndsWith('x') || word.EndsWith('z') ||
             word.EndsWith("ch") || word.EndsWith("sh"))
-        {
             return word + "es";
-        }
 
-        if (word.EndsWith('y') && word.Length > 1 && !IsVowel(word[^2]))
-        {
-            return word[..^1] + "ies";
-        }
+        if (word.EndsWith('y') && word.Length > 1 && !IsVowel(word[^2])) return word[..^1] + "ies";
 
-        if (word.EndsWith('f'))
-        {
-            return word[..^1] + "ves";
-        }
+        if (word.EndsWith('f')) return word[..^1] + "ves";
 
-        if (word.EndsWith("fe"))
-        {
-            return word[..^2] + "ves";
-        }
+        if (word.EndsWith("fe")) return word[..^2] + "ves";
 
         return word + "s";
     }

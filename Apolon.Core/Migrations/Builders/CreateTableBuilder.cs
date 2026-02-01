@@ -4,16 +4,16 @@ using Apolon.Core.Migrations.Models;
 namespace Apolon.Core.Migrations.Builders;
 
 /// <summary>
-/// Builder for defining table constraints within a CreateTable operation.
+///     Builder for defining table constraints within a CreateTable operation.
 /// </summary>
 /// <typeparam name="TColumns">Anonymous type representing the columns.</typeparam>
 public sealed class CreateTableBuilder<TColumns>
 {
-    private readonly TableDefinition _tableDefinition;
-    private PrimaryKeyConstraint? _primaryKey;
-    private readonly List<ForeignKeyConstraint> _foreignKeys = [];
-    private readonly List<UniqueConstraint> _uniqueConstraints = [];
     private readonly List<CheckConstraint> _checkConstraints = [];
+    private readonly List<ForeignKeyConstraint> _foreignKeys = [];
+    private readonly TableDefinition _tableDefinition;
+    private readonly List<UniqueConstraint> _uniqueConstraints = [];
+    private PrimaryKeyConstraint? _primaryKey;
 
     internal CreateTableBuilder(TableDefinition tableDefinition)
     {
@@ -21,7 +21,7 @@ public sealed class CreateTableBuilder<TColumns>
     }
 
     /// <summary>
-    /// Defines a primary key constraint.
+    ///     Defines a primary key constraint.
     /// </summary>
     /// <param name="name">The constraint name (e.g., "PK_Customers").</param>
     /// <param name="columns">Expression selecting the column(s) for the primary key.</param>
@@ -39,7 +39,7 @@ public sealed class CreateTableBuilder<TColumns>
     }
 
     /// <summary>
-    /// Defines a foreign key constraint.
+    ///     Defines a foreign key constraint.
     /// </summary>
     /// <param name="name">The constraint name (e.g., "FK_Orders_Customers").</param>
     /// <param name="columns">Expression selecting the local column(s).</param>
@@ -72,7 +72,7 @@ public sealed class CreateTableBuilder<TColumns>
     }
 
     /// <summary>
-    /// Defines a unique constraint.
+    ///     Defines a unique constraint.
     /// </summary>
     /// <param name="name">The constraint name (e.g., "UQ_Customers_Email").</param>
     /// <param name="columns">Expression selecting the column(s) for the unique constraint.</param>
@@ -90,7 +90,7 @@ public sealed class CreateTableBuilder<TColumns>
     }
 
     /// <summary>
-    /// Defines a check constraint.
+    ///     Defines a check constraint.
     /// </summary>
     /// <param name="name">The constraint name (e.g., "CK_Products_Price").</param>
     /// <param name="expression">The SQL expression for the check (e.g., "Price > 0").</param>
@@ -107,7 +107,7 @@ public sealed class CreateTableBuilder<TColumns>
     }
 
     /// <summary>
-    /// Builds the final TableDefinition with all constraints.
+    ///     Builds the final TableDefinition with all constraints.
     /// </summary>
     internal TableDefinition Build()
     {
@@ -121,7 +121,7 @@ public sealed class CreateTableBuilder<TColumns>
     }
 
     /// <summary>
-    /// Extracts column names from a lambda expression (e.g., x => x.Id or x => new { x.Id, x.Name }).
+    ///     Extracts column names from a lambda expression (e.g., x => x.Id or x => new { x.Id, x.Name }).
     /// </summary>
     private static List<string> ExtractColumnNames(Expression<Func<TColumns, object>> expression)
     {
@@ -136,12 +136,8 @@ public sealed class CreateTableBuilder<TColumns>
         else if (expression.Body is NewExpression newExpr)
         {
             foreach (var arg in newExpr.Arguments)
-            {
                 if (arg is MemberExpression member)
-                {
                     columnNames.Add(member.Member.Name);
-                }
-            }
         }
         // Handle: x => (object)x.PropertyName (conversion)
         else if (expression.Body is UnaryExpression { NodeType: ExpressionType.Convert } unaryExpr &&

@@ -7,7 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Apolon.Core\Apolon.Core.csproj" />
+        <ProjectReference Include="..\Apolon.Core\Apolon.Core.csproj"/>
     </ItemGroup>
 
 </Project>

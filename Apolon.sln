@@ -6,8 +6,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Apolon.Models", "Apolon.Mod
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Apolon.WebApp", "Apolon.WebApp\Apolon.WebApp.csproj", "{0B4A2BCF-2332-49AC-AB2B-D69BF596A17A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Apolon.Console", "Apolon.Console\Apolon.Console.csproj", "{7AAB947A-0B5C-4C2E-AE1F-C879E683918F}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Apolon.Core.Tests", "Apolon.Core.Tests\Apolon.Core.Tests.csproj", "{A252D907-9878-4CC7-9A35-C59264D03E0A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Apolon.CLI", "Apolon.CLI\Apolon.CLI.csproj", "{60524D24-B2A6-4C8D-98EB-B6D83726BAB5}"
@@ -30,10 +28,6 @@ Global
 		{0B4A2BCF-2332-49AC-AB2B-D69BF596A17A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0B4A2BCF-2332-49AC-AB2B-D69BF596A17A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0B4A2BCF-2332-49AC-AB2B-D69BF596A17A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{7AAB947A-0B5C-4C2E-AE1F-C879E683918F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{7AAB947A-0B5C-4C2E-AE1F-C879E683918F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{7AAB947A-0B5C-4C2E-AE1F-C879E683918F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{7AAB947A-0B5C-4C2E-AE1F-C879E683918F}.Release|Any CPU.Build.0 = Release|Any CPU
 		{A252D907-9878-4CC7-9A35-C59264D03E0A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A252D907-9878-4CC7-9A35-C59264D03E0A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A252D907-9878-4CC7-9A35-C59264D03E0A}.Release|Any CPU.ActiveCfg = Release|Any CPU

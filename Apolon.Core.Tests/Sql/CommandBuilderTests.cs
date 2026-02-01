@@ -269,8 +269,7 @@ public class CommandBuilderTests
 [Table("simple_entity", Schema = "public")]
 public class SimpleEntity
 {
-    [PrimaryKey]
-    public int Id { get; set; }
+    [PrimaryKey] public int Id { get; set; }
 
     public string Name { get; set; } = string.Empty;
 
@@ -280,8 +279,7 @@ public class SimpleEntity
 [Table("nullable_entity", Schema = "public")]
 public class EntityWithNullables
 {
-    [PrimaryKey]
-    public int Id { get; set; }
+    [PrimaryKey] public int Id { get; set; }
 
     public string Name { get; set; } = string.Empty;
 
@@ -291,14 +289,11 @@ public class EntityWithNullables
 [Table("complex_entity", Schema = "public")]
 public class ComplexEntity
 {
-    [PrimaryKey]
-    public int Id { get; set; }
+    [PrimaryKey] public int Id { get; set; }
 
-    [Column("first_name")]
-    public string FirstName { get; set; } = string.Empty;
+    [Column("first_name")] public string FirstName { get; set; } = string.Empty;
 
-    [Column("last_name")]
-    public string LastName { get; set; } = string.Empty;
+    [Column("last_name")] public string LastName { get; set; } = string.Empty;
 
     public string Email { get; set; } = string.Empty;
 
@@ -308,8 +303,7 @@ public class ComplexEntity
 [Table("guid_pk_entity", Schema = "public")]
 public class EntityWithGuidPk
 {
-    [PrimaryKey(AutoIncrement = false)]
-    public Guid Id { get; set; }
+    [PrimaryKey(AutoIncrement = false)] public Guid Id { get; set; }
 
     public string Name { get; set; } = string.Empty;
 }
@@ -317,8 +311,7 @@ public class EntityWithGuidPk
 [Table("custom_table", Schema = "custom_schema")]
 public class EntityWithCustomSchema
 {
-    [PrimaryKey]
-    public int Id { get; set; }
+    [PrimaryKey] public int Id { get; set; }
 
     public string Name { get; set; } = string.Empty;
 }
@@ -326,8 +319,7 @@ public class EntityWithCustomSchema
 [Table("string_pk_entity", Schema = "public")]
 public class EntityWithStringPk
 {
-    [PrimaryKey(AutoIncrement = false)]
-    public string Code { get; set; } = string.Empty;
+    [PrimaryKey(AutoIncrement = false)] public string Code { get; set; } = string.Empty;
 
     public string Description { get; set; } = string.Empty;
 }
@@ -335,6 +327,5 @@ public class EntityWithStringPk
 [Table("pk_only_entity", Schema = "public")]
 public class EntityWithOnlyPk
 {
-    [PrimaryKey]
-    public int Id { get; set; }
+    [PrimaryKey] public int Id { get; set; }
 }

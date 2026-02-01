@@ -1,5 +1,4 @@
 ﻿using Apolon.Core.Attributes;
-using Apolon.Models;
 
 namespace Apolon.WebApp.Models;
 
@@ -19,15 +18,18 @@ public class Checkup : BaseEntity
     public DateTime CheckupDate { get; set; }
     public string? Notes { get; set; }
     public string? Results { get; set; }
-    
-    // [NotMapped]
+
+    [NotMapped]
     public string? Test { get; set; }
-    
+
     // Navigation properties
     public Patient? Patient { get; set; }
     public CheckupType? CheckupType { get; set; }
     public ICollection<Prescription> Prescriptions { get; set; } = new List<Prescription>();
 
-    public override string ToString() =>
-        $"{nameof(PatientId)}: {PatientId}, {nameof(CheckupTypeId)}: {CheckupTypeId}, {nameof(CheckupDate)}: {CheckupDate}, {nameof(Notes)}: {Notes}, {nameof(Results)}: {Results}";
+    public override string ToString()
+    {
+        return
+            $"{nameof(PatientId)}: {PatientId}, {nameof(CheckupTypeId)}: {CheckupTypeId}, {nameof(CheckupDate)}: {CheckupDate}, {nameof(Notes)}: {Notes}, {nameof(Results)}: {Results}";
+    }
 }

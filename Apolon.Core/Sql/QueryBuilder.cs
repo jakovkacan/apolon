@@ -8,14 +8,17 @@ namespace Apolon.Core.Sql;
 public class QueryBuilder<T> where T : class
 {
     private readonly EntityMetadata _metadata = EntityMapper.GetMetadata(typeof(T));
-    private readonly List<string> _whereClauses = [];
-    private readonly List<ParameterMapping> _parameters = [];
     private readonly List<string> _orderClauses = [];
+    private readonly List<ParameterMapping> _parameters = [];
+    private readonly List<string> _whereClauses = [];
     private int? _limit;
     private int? _offset;
-    private int _parameterCounter = 0;
+    private int _parameterCounter;
 
-    public List<ParameterMapping> GetParameters() => _parameters;
+    public List<ParameterMapping> GetParameters()
+    {
+        return _parameters;
+    }
 
     public QueryBuilder<T> Where(Expression<Func<T, bool>> predicate)
     {
@@ -24,10 +27,15 @@ public class QueryBuilder<T> where T : class
         return this;
     }
 
-    public QueryBuilder<T> OrderBy<TKey>(Expression<Func<T, TKey>> keySelector) => AddOrder(keySelector, "ASC");
+    public QueryBuilder<T> OrderBy<TKey>(Expression<Func<T, TKey>> keySelector)
+    {
+        return AddOrder(keySelector, "ASC");
+    }
 
-    public QueryBuilder<T> OrderByDescending<TKey>(Expression<Func<T, TKey>> keySelector) =>
-        AddOrder(keySelector, "DESC");
+    public QueryBuilder<T> OrderByDescending<TKey>(Expression<Func<T, TKey>> keySelector)
+    {
+        return AddOrder(keySelector, "DESC");
+    }
 
 
     public QueryBuilder<T> WhereRaw(string clause, object parameterValue)
@@ -62,10 +70,7 @@ public class QueryBuilder<T> where T : class
     {
         var sql = BuildSelectClause();
 
-        if (_whereClauses.Count > 0)
-        {
-            sql += " WHERE " + string.Join(" AND ", _whereClauses);
-        }
+        if (_whereClauses.Count > 0) sql += " WHERE " + string.Join(" AND ", _whereClauses);
 
         if (_orderClauses.Count > 0)
             sql += " ORDER BY " + string.Join(", ", _orderClauses);
@@ -127,22 +132,19 @@ public class QueryBuilder<T> where T : class
 
         throw new OrmException($"Unsupported method: {expr.Method.Name}");
     }
-    
+
     private string TranslateMemberExpression(MemberExpression expr)
     {
         // Check if this is accessing a parameter property
-        if (expr.Expression is ParameterExpression)
-        {
-            return GetColumnName(expr.Member.Name);
-        }
-    
+        if (expr.Expression is ParameterExpression) return GetColumnName(expr.Member.Name);
+
         // Otherwise, it's a captured variable (e.g., migrationName from closure)
         // Evaluate it to get the actual value
         var objectMember = Expression.Convert(expr, typeof(object));
         var getterLambda = Expression.Lambda<Func<object>>(objectMember);
         var getter = getterLambda.Compile();
         var value = getter();
-    
+
         return AddParameter(value ?? DBNull.Value);
     }
 

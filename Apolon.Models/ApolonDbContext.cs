@@ -9,14 +9,14 @@ public class ApolonDbContext : DbContext
     {
     }
 
-    public static Task<ApolonDbContext> CreateAsync(string connectionString)
-    {
-        return CreateAsync<ApolonDbContext>(connectionString);
-    }
-
     public DbSet<Patient> Patients => Set<Patient>();
     public DbSet<Checkup> Checkups => Set<Checkup>();
     public DbSet<Medication> Medications => Set<Medication>();
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
     public DbSet<CheckupType> CheckupTypes => Set<CheckupType>();
+
+    public static ApolonDbContext Create(string connectionString)
+    {
+        return Create<ApolonDbContext>(connectionString);
+    }
 }

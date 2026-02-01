@@ -1,12 +1,11 @@
 ﻿using Apolon.Console.Migrations;
-using Apolon.Core.Context;
-using Apolon.Core.Migrations;
+using Apolon.Core.Sql;
 using Apolon.Models;
 
 const string connectionString =
     "Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=apolon;";
 
-var context = await ApolonDbContext.CreateAsync(connectionString);
+var context = ApolonDbContext.Create(connectionString);
 try
 {
     Console.WriteLine("Connecting to database...");
@@ -14,102 +13,65 @@ try
     await context.Database.OpenConnectionAsync();
 
     Console.WriteLine("Connected to database.");
-    
-    // context.Database.Migrate(typeof(AddCustomers));
 
-    // Console.WriteLine("PATIENTS");
-    // var patients = context.Patients.ToList();
-    // patients.ForEach(Console.WriteLine);
-    //
-    // Console.WriteLine("CHECKUPS");
-    // var checkups = context.Checkups.Include(c => c.CheckupType, c => c.Patient).ToList();
-    // checkups.ForEach(checkup => { Console.WriteLine($"{checkup} for {checkup.Patient}"); });
-    //
-    // Console.WriteLine("MEDICATIONS");
-    // var medications = context.Medications.ToList();
-    // medications.ForEach(Console.WriteLine);
-    //
-    // Console.WriteLine("PRESCRIPTIONS");
-    // var prescriptions = context.Prescriptions.ToList();
-    // prescriptions.ForEach(Console.WriteLine);
-    //
-    // Console.WriteLine("DONE");
+    Console.WriteLine("PATIENTS");
+    var patients = context.Patients.ToList();
+    patients.ForEach(Console.WriteLine);
 
-    // Console.WriteLine(DatabaseFacade.DumpModelSql([
-    //     typeof(Checkup), typeof(CheckupType), typeof(Medication), typeof(Patient), typeof(Prescription), 
-    // ]));
+    Console.WriteLine("CHECKUPS");
+    var checkups = context.Checkups.Include(c => c.CheckupType, c => c.Patient).ToList();
+    checkups.ForEach(checkup => { Console.WriteLine($"{checkup} for {checkup.Patient}"); });
 
-    // List<Type> entityTypes =
-    // [
-    //     typeof(Test),
-    //     typeof(Checkup), typeof(CheckupType), typeof(Medication), typeof(Patient), typeof(Prescription), 
-    // ];
-    //
-    // var modelSnapshot = DatabaseFacade.DumpModelSchema(entityTypes.ToArray());
-    // var snapshot = await context.Database.DumpDbSchema();
+    Console.WriteLine("MEDICATIONS");
+    var medications = context.Medications.ToList();
+    medications.ForEach(Console.WriteLine);
 
-    // Console.WriteLine("MODEL SCHEMA");
-    // Console.WriteLine(modelSnapshot);
-    //
-    // Console.WriteLine("DB SCHEMA");
-    // Console.WriteLine(snapshot);
+    Console.WriteLine("PRESCRIPTIONS");
+    var prescriptions = context.Prescriptions.ToList();
+    prescriptions.ForEach(Console.WriteLine);
 
-    // Console.WriteLine("ASSERT EQUAL");
-    // Console.WriteLine(snapshot.Equals(modelSnapshot));
-    //
-    // if (!snapshot.Equals(modelSnapshot))
-    // {
-    //     var diffs = DatabaseFacade.DiffSchema(modelSnapshot, snapshot);
-    //     var diffsList = diffs.ToList();
-    //     diffsList.ForEach(Console.WriteLine);
-    //     
-    //     Console.WriteLine("SYNC SCHEMA");
-    //     var sql = await context.Database.SyncSchemaAsync(entityTypes.ToArray());
-    //     
-    //     Console.WriteLine("ASSERT EQUAL AFTER SYNC");
-    //     var newSnapshot = await context.Database.DumpDbSchema();
-    //     Console.WriteLine(newSnapshot.Equals(modelSnapshot));
-    // }
-    
-    // var blogs = await db.Blogs
-    //     .Where(b => b.Rating > 3)
-    //     .OrderBy(b => b.Url)
-    //     .ToListAsync();
+    Console.WriteLine("DONE");
 
-    // var query = context.Patients.Query().Where(p => p.PhoneNumber == "0123456789").ToList(context.Patients);
-    // query.ForEach(Console.WriteLine);
 
-    // context.Database.BeginTransaction();
-    //
-    // var patient = new Patient() {
-    //     FirstName = "Despa",
-    //     LastName = "Cito",
-    //     Email = "despacito@mail.com",
-    //     PhoneNumber = "0123456789",
-    //     DateOfBirth = DateTime.Now.AddYears(-20),
-    //     Address = "123 Main St",
-    //     Gender = "Male"
-    // };
-    //
-    // context.Patients.Add(patient);
-    //
-    // context.SaveChanges();
-    //
-    // context.Patients.ToList().ForEach(Console.WriteLine);
-    //
-    // context.Database.RollbackTransaction();
-    //
-    // context.Patients.ToList().ForEach(Console.WriteLine);
+    List<Type> entityTypes =
+    [
+        typeof(Test),
+        typeof(Checkup), typeof(CheckupType), typeof(Medication), typeof(Patient), typeof(Prescription)
+    ];
 
-    // context.Database.EnsureCreated();
+    var query = context.Patients.Query().Where(p => p.PhoneNumber == "0123456789").ToList(context.Patients);
+    query.ForEach(Console.WriteLine);
 
+    context.Database.BeginTransaction();
+
+    var patient = new Patient
+    {
+        FirstName = "Despa",
+        LastName = "Cito",
+        Email = "despacito@mail.com",
+        PhoneNumber = "0123456789",
+        DateOfBirth = DateTime.Now.AddYears(-20),
+        Address = "123 Main St",
+        Gender = "Male"
+    };
+
+    context.Patients.Add(patient);
+
+    context.SaveChanges();
+
+    context.Patients.ToList().ForEach(Console.WriteLine);
+
+    context.Database.RollbackTransaction();
+
+    context.Patients.ToList().ForEach(Console.WriteLine);
+    //
     // var checkups = context.Checkups.Include(c => c.CheckupType, c => c.Patient).ToList();
     // foreach (var checkup in checkups)
     // {
     //     Console.WriteLine(
     //         $"Checkup: Patient Name: {checkup.Patient.FirstName} {checkup.Patient.LastName}, Checkup Type: {checkup.CheckupType.TypeCode}, CheckupDate: {checkup.CheckupDate}, Notes: {checkup.Notes}, Results: {checkup.Results}");
     // }
-
+    //
     // var checkup2 = new Checkup { PatientId = 1, CheckupTypeId = 1, CheckupDate = DateTime.Now.Subtract(TimeSpan.FromDays(30)), Notes = "Regular checkup", Results = "It's over guys" };
     // context.Checkups.Add(checkup2);
     // context.SaveChanges();
@@ -124,7 +86,7 @@ try
     //         Console.WriteLine($"Checkup: {checkup.CheckupDate}, Notes: {checkup.Notes}, Results: {checkup.Results}");
     //     }
     // }
-
+    //
     // var patient = new Patient
     // {
     //     FirstName = "Ivan", 
@@ -137,25 +99,25 @@ try
     // };
     // context.Patients.Add(patient);
     // context.SaveChanges();
-    //
+
     // var patient = patients.FirstOrDefault(p => p.FirstName == "Ivan");
-    // patient.LastName = "Excusemić";
-    // context.Patients.Update(patient);
-    // context.Patients.SaveChanges();
-    //
-    // context.SaveChanges();
+    patient.LastName = "Excusemić";
+    context.Patients.Update(patient);
+    context.Patients.SaveChanges();
 
-    // context.SaveChanges();
+    context.SaveChanges();
 
-    // context.Patients.ToList().ForEach(Console.WriteLine);
+    context.SaveChanges();
 
-    // var type = new CheckupType { TypeCode = "X-RAY", Description = "X-Ray" };
-    //
-    // context.CheckupTypes.Add(type);
-    // context.SaveChanges();
+    context.Patients.ToList().ForEach(Console.WriteLine);
+
+    var type = new CheckupType { TypeCode = "X-RAY", Description = "X-Ray" };
+
+    context.CheckupTypes.Add(type);
+    context.SaveChanges();
 
     // var query = new QueryBuilder<Medication>().Where(x => x.Name.Contains("Lupocet"));
-
+    //
     // var medication = context.Medications
     //     .ExecuteQuery(query)
     //     .FirstOrDefault();
@@ -166,7 +128,7 @@ try
     // {
     //     Console.WriteLine($"Medication: {med.Name}, Generic Name: {med.GenericName}, Dosage Form: {med.DosageForm}");
     // }
-
+    //
     // if (lupocet != null)
     // {
     //     lupocet.GenericName = "Forte";
@@ -176,19 +138,19 @@ try
     //     Console.WriteLine("Updated medication.");
     // }
 
-    // var medication = new Medication
-    // {
-    //     Name = "Lupocet",
-    //     GenericName = "Lupocet",
-    //     DosageForm = "Tablet"
-    // };
-    //
-    // context.Medications.Add(medication);
-    // context.SaveChanges();
+    var medication = new Medication
+    {
+        Name = "Lupocet",
+        GenericName = "Lupocet",
+        DosageForm = "Tablet"
+    };
 
-    // Console.WriteLine("Added medication.");
+    context.Medications.Add(medication);
+    context.SaveChanges();
 
-    // context.Medications.Query();
+    Console.WriteLine("Added medication.");
+
+    context.Medications.Query();
 
     // var patient = new Patient
     // {
@@ -202,9 +164,9 @@ try
     //     CreatedAt = DateTime.Now,
     //     UpdatedAt = DateTime.Now,
     // };
-    //
-    // context.Patients.Add(patient);
-    // context.SaveChanges();
+
+    context.Patients.Add(patient);
+    context.SaveChanges();
 }
 catch (Exception ex)
 {

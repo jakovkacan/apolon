@@ -1,7 +1,5 @@
-﻿using Apolon.Core.DataAccess;
-using Apolon.Core.Migrations;
+﻿using Apolon.Core.Migrations;
 using Apolon.Core.Migrations.Models;
-using Xunit;
 
 namespace Apolon.Core.Tests.Migrations;
 
@@ -92,7 +90,8 @@ public class MigrationRunnerTests
         };
         var appliedMigrations = new List<string>();
 
-        var result = MigrationRunner.DetermineMigrationsToRun(allMigrations, appliedMigrations, "20240102000000_Second");
+        var result =
+            MigrationRunner.DetermineMigrationsToRun(allMigrations, appliedMigrations, "20240102000000_Second");
 
         Assert.Equal(2, result.Count);
         Assert.Equal("20240101000000_First", result[0].FullName);

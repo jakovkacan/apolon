@@ -25,10 +25,7 @@ internal static class SchemaDiffer
             ops.Add(new MigrationOperation(MigrationOperationType.CreateTable, expTable.Schema, expTable.Name));
 
             // Add all columns for newly created tables.
-            foreach (var expCol in expTable.Columns)
-            {
-                AddColumnOps(ops, expTable, expCol);
-            }
+            foreach (var expCol in expTable.Columns) AddColumnOps(ops, expTable, expCol);
         }
 
         // 1b) Drop tables that no longer exist in the model
@@ -69,7 +66,7 @@ internal static class SchemaDiffer
                     MigrationOperationType.DropColumn,
                     expTable.Schema,
                     expTable.Name,
-                    Column: actCol.ColumnName
+                    actCol.ColumnName
                 ));
             }
 
@@ -80,53 +77,45 @@ internal static class SchemaDiffer
                     continue;
 
                 if (IsTypeDifferent(expCol, actCol))
-                {
                     ops.Add(new MigrationOperation(
                         MigrationOperationType.AlterColumnType,
                         expTable.Schema,
                         expTable.Name,
-                        Column: colName,
-                        SqlType: expCol.DataType,
-                        CharacterMaximumLength: expCol.CharacterMaximumLength,
-                        NumericPrecision: expCol.NumericPrecision,
-                        NumericScale: expCol.NumericScale,
-                        DateTimePrecision: expCol.DateTimePrecision
+                        colName,
+                        expCol.DataType,
+                        expCol.CharacterMaximumLength,
+                        expCol.NumericPrecision,
+                        expCol.NumericScale,
+                        expCol.DateTimePrecision
                     ));
-                }
 
                 if (expCol.IsNullable != actCol.IsNullable)
-                {
                     ops.Add(new MigrationOperation(
                         MigrationOperationType.AlterNullability,
                         expTable.Schema,
                         expTable.Name,
-                        Column: colName,
+                        colName,
                         IsNullable: expCol.IsNullable
                     ));
-                }
 
                 // Default compare (normalized strings)
                 if (!string.Equals(expCol.ColumnDefault, actCol.ColumnDefault, StringComparison.Ordinal))
                 {
                     if (expCol.ColumnDefault is null)
-                    {
                         ops.Add(new MigrationOperation(
                             MigrationOperationType.DropDefault,
                             expTable.Schema,
                             expTable.Name,
-                            Column: colName
+                            colName
                         ));
-                    }
                     else
-                    {
                         ops.Add(new MigrationOperation(
                             MigrationOperationType.SetDefault,
                             expTable.Schema,
                             expTable.Name,
-                            Column: colName,
+                            colName,
                             DefaultSql: expCol.ColumnDefault
                         ));
-                    }
                 }
 
                 var fkMismatch =
@@ -141,36 +130,29 @@ internal static class SchemaDiffer
                 if (!fkMismatch) continue;
 
                 if (actCol.IsForeignKey && !string.IsNullOrWhiteSpace(actCol.FkConstraintName))
-                {
                     ops.Add(new MigrationOperation(
                         MigrationOperationType.DropConstraint,
                         expTable.Schema,
                         expTable.Name,
                         ConstraintName: actCol.FkConstraintName
                     ));
-                }
 
                 if (expCol.IsForeignKey)
-                {
                     ops.Add(new MigrationOperation(
-                        Type: MigrationOperationType.AddForeignKey,
-                        Schema: expTable.Schema,
-                        Table: expTable.Name,
-                        Column: colName,
+                        MigrationOperationType.AddForeignKey,
+                        expTable.Schema,
+                        expTable.Name,
+                        colName,
                         ConstraintName: expCol.FkConstraintName,
                         RefSchema: expCol.ReferencesSchema,
                         RefTable: expCol.ReferencesTable,
                         RefColumn: expCol.ReferencesColumn,
                         OnDeleteRule: expCol.FkDeleteRule // may be null model-side; builder can default
                     ));
-                }
             }
         }
 
-        if (commitedOperations != null)
-        {
-            ops.RemoveAll(commitedOperations.Contains);
-        }
+        if (commitedOperations != null) ops.RemoveAll(commitedOperations.Contains);
 
         // Important ordering note:
         // - Create schemas/tables first
@@ -185,46 +167,42 @@ internal static class SchemaDiffer
         ColumnSnapshot expCol)
     {
         ops.Add(new MigrationOperation(
-            Type: MigrationOperationType.AddColumn,
-            Schema: expTable.Schema,
-            Table: expTable.Name,
-            Column: expCol.ColumnName,
-            SqlType: expCol.DataType,
-            CharacterMaximumLength: expCol.CharacterMaximumLength,
-            NumericPrecision: expCol.NumericPrecision,
-            NumericScale: expCol.NumericScale,
-            DateTimePrecision: expCol.DateTimePrecision,
-            IsPrimaryKey: expCol.IsPrimaryKey,
-            IsIdentity: expCol.IsIdentity,
-            IdentityGeneration: expCol.IdentityGeneration,
-            IsNullable: expCol.IsNullable,
-            DefaultSql: expCol.ColumnDefault
+            MigrationOperationType.AddColumn,
+            expTable.Schema,
+            expTable.Name,
+            expCol.ColumnName,
+            expCol.DataType,
+            expCol.CharacterMaximumLength,
+            expCol.NumericPrecision,
+            expCol.NumericScale,
+            expCol.DateTimePrecision,
+            expCol.IsPrimaryKey,
+            expCol.IsIdentity,
+            expCol.IdentityGeneration,
+            expCol.IsNullable,
+            expCol.ColumnDefault
         ));
 
         if (expCol.IsUnique)
-        {
             ops.Add(new MigrationOperation(
-                Type: MigrationOperationType.AddUnique,
-                Schema: expTable.Schema,
-                Table: expTable.Name,
-                Column: expCol.ColumnName
+                MigrationOperationType.AddUnique,
+                expTable.Schema,
+                expTable.Name,
+                expCol.ColumnName
             ));
-        }
 
         if (expCol.IsForeignKey)
-        {
             ops.Add(new MigrationOperation(
-                Type: MigrationOperationType.AddForeignKey,
-                Schema: expTable.Schema,
-                Table: expTable.Name,
-                Column: expCol.ColumnName,
+                MigrationOperationType.AddForeignKey,
+                expTable.Schema,
+                expTable.Name,
+                expCol.ColumnName,
                 ConstraintName: expCol.FkConstraintName,
                 RefSchema: expCol.ReferencesSchema,
                 RefTable: expCol.ReferencesTable,
                 RefColumn: expCol.ReferencesColumn,
                 OnDeleteRule: expCol.FkDeleteRule // may be null model-side; builder can default
             ));
-        }
     }
 
     private static bool IsTypeDifferent(ColumnSnapshot expected, ColumnSnapshot actual)

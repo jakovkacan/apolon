@@ -123,189 +123,177 @@ internal static class SnapshotReader
         // If you want a consistent snapshot while schema may change, uncomment these:
         // db.BeginTransaction();
 
-        try
+        // await db.OpenConnectionAsync();
+
+        await using var cmd = db.CreateCommand(Sql);
+
+        var tableMap = new Dictionary<(string Schema, string Table), List<ColumnSnapshot>>();
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+
+        var iSchema = reader.GetOrdinal("table_schema");
+        var iTable = reader.GetOrdinal("table_name");
+        var iColumn = reader.GetOrdinal("column_name");
+
+        var iDataType = reader.GetOrdinal("data_type");
+        var iUdtName = reader.GetOrdinal("udt_name");
+        var iCharMaxLen = reader.GetOrdinal("character_maximum_length");
+        var iNumPrecision = reader.GetOrdinal("numeric_precision");
+        var iNumScale = reader.GetOrdinal("numeric_scale");
+        var iDateTimePrecision = reader.GetOrdinal("datetime_precision");
+
+        var iNullable = reader.GetOrdinal("is_nullable");
+        var iDefault = reader.GetOrdinal("column_default");
+
+        var iIsIdentity = reader.GetOrdinal("is_identity");
+        var iIdentityGeneration = reader.GetOrdinal("identity_generation");
+        var iIsGenerated = reader.GetOrdinal("is_generated");
+        var iGenerationExpression = reader.GetOrdinal("generation_expression");
+
+        var iIsPk = reader.GetOrdinal("is_primary_key");
+        var iPkName = reader.GetOrdinal("pk_constraint_name");
+
+        var iIsUnique = reader.GetOrdinal("is_unique");
+        var iUniqueName = reader.GetOrdinal("unique_constraint_name");
+
+        var iIsFk = reader.GetOrdinal("is_foreign_key");
+        var iFkName = reader.GetOrdinal("fk_constraint_name");
+        var iRefSchema = reader.GetOrdinal("references_schema");
+        var iRefTable = reader.GetOrdinal("references_table");
+        var iRefCol = reader.GetOrdinal("references_column");
+        var iFkUpdate = reader.GetOrdinal("fk_update_rule");
+        var iFkDelete = reader.GetOrdinal("fk_delete_rule");
+
+        while (await reader.ReadAsync(ct))
         {
-            // await db.OpenConnectionAsync();
+            // Raw read
+            var schemaRaw = reader.GetString(iSchema);
+            var tableRaw = reader.GetString(iTable);
+            var columnRaw = reader.GetString(iColumn);
 
-            await using var cmd = db.CreateCommand(Sql);
+            var isNullable = string.Equals(reader.GetString(iNullable), "YES", StringComparison.OrdinalIgnoreCase);
 
-            var tableMap = new Dictionary<(string Schema, string Table), List<ColumnSnapshot>>();
+            var isPk = string.Equals(reader.GetString(iIsPk), "YES", StringComparison.OrdinalIgnoreCase);
+            var isUnique = string.Equals(reader.GetString(iIsUnique), "YES", StringComparison.OrdinalIgnoreCase);
+            var isForeignKey = string.Equals(reader.GetString(iIsFk), "YES", StringComparison.OrdinalIgnoreCase);
 
-            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            var dataTypeRaw = reader.GetString(iDataType);
+            var udtNameRaw = reader.GetString(iUdtName);
 
-            var iSchema = reader.GetOrdinal("table_schema");
-            var iTable = reader.GetOrdinal("table_name");
-            var iColumn = reader.GetOrdinal("column_name");
+            int? charMaxLen = reader.IsDBNull(iCharMaxLen) ? null : reader.GetInt32(iCharMaxLen);
+            int? numericPrecision = reader.IsDBNull(iNumPrecision)
+                ? null
+                : Convert.ToInt32(reader.GetValue(iNumPrecision));
+            int? numericScale = reader.IsDBNull(iNumScale) ? null : Convert.ToInt32(reader.GetValue(iNumScale));
+            int? dateTimePrecision = reader.IsDBNull(iDateTimePrecision)
+                ? null
+                : Convert.ToInt32(reader.GetValue(iDateTimePrecision));
 
-            var iDataType = reader.GetOrdinal("data_type");
-            var iUdtName = reader.GetOrdinal("udt_name");
-            var iCharMaxLen = reader.GetOrdinal("character_maximum_length");
-            var iNumPrecision = reader.GetOrdinal("numeric_precision");
-            var iNumScale = reader.GetOrdinal("numeric_scale");
-            var iDateTimePrecision = reader.GetOrdinal("datetime_precision");
+            var defaultRaw = reader.IsDBNull(iDefault) ? null : reader.GetString(iDefault);
 
-            var iNullable = reader.GetOrdinal("is_nullable");
-            var iDefault = reader.GetOrdinal("column_default");
+            var isIdentity = string.Equals(reader.GetString(iIsIdentity), "YES",
+                StringComparison.OrdinalIgnoreCase);
+            var identityGenerationRaw =
+                reader.IsDBNull(iIdentityGeneration) ? null : reader.GetString(iIdentityGeneration);
 
-            var iIsIdentity = reader.GetOrdinal("is_identity");
-            var iIdentityGeneration = reader.GetOrdinal("identity_generation");
-            var iIsGenerated = reader.GetOrdinal("is_generated");
-            var iGenerationExpression = reader.GetOrdinal("generation_expression");
+            var isGeneratedRaw = reader.GetString(iIsGenerated); // "ALWAYS" or "NEVER"
+            var isGenerated = string.Equals(isGeneratedRaw, "ALWAYS", StringComparison.OrdinalIgnoreCase);
+            var generationExpressionRaw = reader.IsDBNull(iGenerationExpression)
+                ? null
+                : reader.GetString(iGenerationExpression);
 
-            var iIsPk = reader.GetOrdinal("is_primary_key");
-            var iPkName = reader.GetOrdinal("pk_constraint_name");
+            var pkNameRaw = reader.IsDBNull(iPkName) ? null : reader.GetString(iPkName);
+            var uniqueNameRaw = reader.IsDBNull(iUniqueName) ? null : reader.GetString(iUniqueName);
 
-            var iIsUnique = reader.GetOrdinal("is_unique");
-            var iUniqueName = reader.GetOrdinal("unique_constraint_name");
+            var fkNameRaw = reader.IsDBNull(iFkName) ? null : reader.GetString(iFkName);
+            var referencesSchemaRaw = reader.IsDBNull(iRefSchema) ? null : reader.GetString(iRefSchema);
+            var referencesTableRaw = reader.IsDBNull(iRefTable) ? null : reader.GetString(iRefTable);
+            var referencesColumnRaw = reader.IsDBNull(iRefCol) ? null : reader.GetString(iRefCol);
+            var fkUpdateRuleRaw = reader.IsDBNull(iFkUpdate) ? null : reader.GetString(iFkUpdate);
+            var fkDeleteRuleRaw = reader.IsDBNull(iFkDelete) ? null : reader.GetString(iFkDelete);
 
-            var iIsFk = reader.GetOrdinal("is_foreign_key");
-            var iFkName = reader.GetOrdinal("fk_constraint_name");
-            var iRefSchema = reader.GetOrdinal("references_schema");
-            var iRefTable = reader.GetOrdinal("references_table");
-            var iRefCol = reader.GetOrdinal("references_column");
-            var iFkUpdate = reader.GetOrdinal("fk_update_rule");
-            var iFkDelete = reader.GetOrdinal("fk_delete_rule");
+            // Normalization (stable diffing)
+            var schema = SnapshotNormalization.NormalizeIdentifier(schemaRaw);
+            var table = SnapshotNormalization.NormalizeIdentifier(tableRaw);
+            var columnName = SnapshotNormalization.NormalizeIdentifier(columnRaw);
 
-            while (await reader.ReadAsync(ct))
+            var dataType = SnapshotNormalization.NormalizeDataType(dataTypeRaw);
+            var udtName = SnapshotNormalization.NormalizeIdentifier(udtNameRaw);
+
+            var columnDefault = SnapshotNormalization.NormalizeDefault(defaultRaw);
+
+            var identityGeneration = identityGenerationRaw is null
+                ? null
+                : SnapshotNormalization.NormalizeIdentifier(identityGenerationRaw);
+
+            var pkConstraintName = pkNameRaw is null ? null : SnapshotNormalization.NormalizeIdentifier(pkNameRaw);
+            var uniqueConstraintName = uniqueNameRaw is null
+                ? null
+                : SnapshotNormalization.NormalizeIdentifier(uniqueNameRaw);
+
+            var fkConstraintName = fkNameRaw is null ? null : SnapshotNormalization.NormalizeIdentifier(fkNameRaw);
+            var referencesSchema = referencesSchemaRaw is null
+                ? null
+                : SnapshotNormalization.NormalizeIdentifier(referencesSchemaRaw);
+            var referencesTable = referencesTableRaw is null
+                ? null
+                : SnapshotNormalization.NormalizeIdentifier(referencesTableRaw);
+            var referencesColumn = referencesColumnRaw is null
+                ? null
+                : SnapshotNormalization.NormalizeIdentifier(referencesColumnRaw);
+
+            var fkUpdateRule = fkUpdateRuleRaw is null
+                ? OnDeleteBehavior.NoAction.ToSql()
+                : SnapshotNormalization.CollapseWhitespace(fkUpdateRuleRaw).ToUpperInvariant();
+            var fkDeleteRule = fkDeleteRuleRaw is null
+                ? null
+                : SnapshotNormalization.CollapseWhitespace(fkDeleteRuleRaw).ToUpperInvariant();
+
+            var col = new ColumnSnapshot(
+                columnName,
+                dataType,
+                IsNullable: isNullable,
+                ColumnDefault: columnDefault,
+                IsForeignKey: isForeignKey,
+                FkConstraintName: fkConstraintName,
+                ReferencesSchema: referencesSchema,
+                ReferencesTable: referencesTable,
+                ReferencesColumn: referencesColumn,
+                FkUpdateRule: fkUpdateRule,
+                FkDeleteRule: fkDeleteRule,
+                IsPrimaryKey: isPk,
+                PkConstraintName: pkConstraintName,
+                IsUnique: isUnique,
+                UniqueConstraintName: uniqueConstraintName,
+                UdtName: udtName,
+                CharacterMaximumLength: charMaxLen,
+                NumericPrecision: numericPrecision,
+                NumericScale: numericScale,
+                DateTimePrecision: dateTimePrecision,
+                IsIdentity: isIdentity,
+                IdentityGeneration: identityGeneration,
+                IsGenerated: isGenerated,
+                GenerationExpression: generationExpressionRaw
+            );
+
+            var key = (schema, table);
+            if (!tableMap.TryGetValue(key, out var cols))
             {
-                // Raw read
-                var schemaRaw = reader.GetString(iSchema);
-                var tableRaw = reader.GetString(iTable);
-                var columnRaw = reader.GetString(iColumn);
-
-                var isNullable = string.Equals(reader.GetString(iNullable), "YES", StringComparison.OrdinalIgnoreCase);
-
-                var isPk = string.Equals(reader.GetString(iIsPk), "YES", StringComparison.OrdinalIgnoreCase);
-                var isUnique = string.Equals(reader.GetString(iIsUnique), "YES", StringComparison.OrdinalIgnoreCase);
-                var isForeignKey = string.Equals(reader.GetString(iIsFk), "YES", StringComparison.OrdinalIgnoreCase);
-
-                var dataTypeRaw = reader.GetString(iDataType);
-                var udtNameRaw = reader.GetString(iUdtName);
-
-                int? charMaxLen = reader.IsDBNull(iCharMaxLen) ? null : reader.GetInt32(iCharMaxLen);
-                int? numericPrecision = reader.IsDBNull(iNumPrecision)
-                    ? null
-                    : Convert.ToInt32(reader.GetValue(iNumPrecision));
-                int? numericScale = reader.IsDBNull(iNumScale) ? null : Convert.ToInt32(reader.GetValue(iNumScale));
-                int? dateTimePrecision = reader.IsDBNull(iDateTimePrecision)
-                    ? null
-                    : Convert.ToInt32(reader.GetValue(iDateTimePrecision));
-
-                var defaultRaw = reader.IsDBNull(iDefault) ? null : reader.GetString(iDefault);
-
-                var isIdentity = string.Equals(reader.GetString(iIsIdentity), "YES",
-                    StringComparison.OrdinalIgnoreCase);
-                var identityGenerationRaw =
-                    reader.IsDBNull(iIdentityGeneration) ? null : reader.GetString(iIdentityGeneration);
-
-                var isGeneratedRaw = reader.GetString(iIsGenerated); // "ALWAYS" or "NEVER"
-                var isGenerated = string.Equals(isGeneratedRaw, "ALWAYS", StringComparison.OrdinalIgnoreCase);
-                var generationExpressionRaw = reader.IsDBNull(iGenerationExpression)
-                    ? null
-                    : reader.GetString(iGenerationExpression);
-
-                var pkNameRaw = reader.IsDBNull(iPkName) ? null : reader.GetString(iPkName);
-                var uniqueNameRaw = reader.IsDBNull(iUniqueName) ? null : reader.GetString(iUniqueName);
-
-                var fkNameRaw = reader.IsDBNull(iFkName) ? null : reader.GetString(iFkName);
-                var referencesSchemaRaw = reader.IsDBNull(iRefSchema) ? null : reader.GetString(iRefSchema);
-                var referencesTableRaw = reader.IsDBNull(iRefTable) ? null : reader.GetString(iRefTable);
-                var referencesColumnRaw = reader.IsDBNull(iRefCol) ? null : reader.GetString(iRefCol);
-                var fkUpdateRuleRaw = reader.IsDBNull(iFkUpdate) ? null : reader.GetString(iFkUpdate);
-                var fkDeleteRuleRaw = reader.IsDBNull(iFkDelete) ? null : reader.GetString(iFkDelete);
-
-                // Normalization (stable diffing)
-                var schema = SnapshotNormalization.NormalizeIdentifier(schemaRaw);
-                var table = SnapshotNormalization.NormalizeIdentifier(tableRaw);
-                var columnName = SnapshotNormalization.NormalizeIdentifier(columnRaw);
-
-                var dataType = SnapshotNormalization.NormalizeDataType(dataTypeRaw);
-                var udtName = SnapshotNormalization.NormalizeIdentifier(udtNameRaw);
-
-                var columnDefault = SnapshotNormalization.NormalizeDefault(defaultRaw);
-
-                var identityGeneration = identityGenerationRaw is null
-                    ? null
-                    : SnapshotNormalization.NormalizeIdentifier(identityGenerationRaw);
-
-                var pkConstraintName = pkNameRaw is null ? null : SnapshotNormalization.NormalizeIdentifier(pkNameRaw);
-                var uniqueConstraintName = uniqueNameRaw is null
-                    ? null
-                    : SnapshotNormalization.NormalizeIdentifier(uniqueNameRaw);
-
-                var fkConstraintName = fkNameRaw is null ? null : SnapshotNormalization.NormalizeIdentifier(fkNameRaw);
-                var referencesSchema = referencesSchemaRaw is null
-                    ? null
-                    : SnapshotNormalization.NormalizeIdentifier(referencesSchemaRaw);
-                var referencesTable = referencesTableRaw is null
-                    ? null
-                    : SnapshotNormalization.NormalizeIdentifier(referencesTableRaw);
-                var referencesColumn = referencesColumnRaw is null
-                    ? null
-                    : SnapshotNormalization.NormalizeIdentifier(referencesColumnRaw);
-
-                var fkUpdateRule = fkUpdateRuleRaw is null
-                    ? OnDeleteBehavior.NoAction.ToSql()
-                    : SnapshotNormalization.CollapseWhitespace(fkUpdateRuleRaw).ToUpperInvariant();
-                var fkDeleteRule = fkDeleteRuleRaw is null
-                    ? null
-                    : SnapshotNormalization.CollapseWhitespace(fkDeleteRuleRaw).ToUpperInvariant();
-
-                var col = new ColumnSnapshot(
-                    ColumnName: columnName,
-                    DataType: dataType,
-                    IsNullable: isNullable,
-                    ColumnDefault: columnDefault,
-                    IsForeignKey: isForeignKey,
-                    FkConstraintName: fkConstraintName,
-                    ReferencesSchema: referencesSchema,
-                    ReferencesTable: referencesTable,
-                    ReferencesColumn: referencesColumn,
-                    FkUpdateRule: fkUpdateRule,
-                    FkDeleteRule: fkDeleteRule,
-                    IsPrimaryKey: isPk,
-                    PkConstraintName: pkConstraintName,
-                    IsUnique: isUnique,
-                    UniqueConstraintName: uniqueConstraintName,
-                    UdtName: udtName,
-                    CharacterMaximumLength: charMaxLen,
-                    NumericPrecision: numericPrecision,
-                    NumericScale: numericScale,
-                    DateTimePrecision: dateTimePrecision,
-                    IsIdentity: isIdentity,
-                    IdentityGeneration: identityGeneration,
-                    IsGenerated: isGenerated,
-                    GenerationExpression: generationExpressionRaw
-                );
-
-                var key = (schema, table);
-                if (!tableMap.TryGetValue(key, out var cols))
-                {
-                    cols = new List<ColumnSnapshot>();
-                    tableMap[key] = cols;
-                }
-
-                cols.Add(col);
+                cols = new List<ColumnSnapshot>();
+                tableMap[key] = cols;
             }
 
-            // db.CommitTransaction();
+            cols.Add(col);
+        }
 
-            var tables = tableMap
-                .OrderBy(x => x.Key.Schema)
-                .ThenBy(x => x.Key.Table)
-                .Select(x => new TableSnapshot(x.Key.Schema, x.Key.Table, x.Value))
-                .ToList();
+        // db.CommitTransaction();
 
-            return new SchemaSnapshot(tables);
-        }
-        catch
-        {
-            // db.RollbackTransaction();
-            throw;
-        }
-        finally
-        {
-            // db.CloseConnection();
-        }
+        var tables = tableMap
+            .OrderBy(x => x.Key.Schema)
+            .ThenBy(x => x.Key.Table)
+            .Select(x => new TableSnapshot(x.Key.Schema, x.Key.Table, x.Value))
+            .ToList();
+
+        return new SchemaSnapshot(tables);
     }
 }

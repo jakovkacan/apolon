@@ -60,10 +60,7 @@ internal static class MigrationBuilderSql
         }
 
         // Remove trailing comma from last line
-        if (lines.Count > 1)
-        {
-            lines[^1] = lines[^1].TrimEnd(',');
-        }
+        if (lines.Count > 1) lines[^1] = lines[^1].TrimEnd(',');
 
         lines.Add(");");
 
@@ -84,7 +81,9 @@ internal static class MigrationBuilderSql
     }
 
     public static string BuildCreateTableFromName(string schema, string table)
-        => $"CREATE TABLE {schema}.{table} ();";
+    {
+        return $"CREATE TABLE {schema}.{table} ();";
+    }
 
     public static string BuildDropTableFromName(string schema, string table, bool cascade = true)
     {
@@ -104,35 +103,50 @@ internal static class MigrationBuilderSql
         string? identityGeneration = null)
     {
         // PRIMARY KEY and IDENTITY columns are implicitly NOT NULL, so we don't add it explicitly
-        var nullSql = (isNullable || isPrimaryKey || isIdentity) ? "" : " NOT NULL";
+        var nullSql = isNullable || isPrimaryKey || isIdentity ? "" : " NOT NULL";
         var defaultClause = string.IsNullOrWhiteSpace(defaultSql) ? "" : $" DEFAULT {defaultSql}";
         var pkClause = isPrimaryKey ? " PRIMARY KEY" : "";
         var identityClause = isIdentity ? $" GENERATED {NormalizeIdentity(identityGeneration)} AS IDENTITY" : "";
-        return $"ALTER TABLE {schema}.{table} ADD COLUMN {column} {sqlType}{defaultClause}{nullSql}{pkClause}{identityClause};";
+        return
+            $"ALTER TABLE {schema}.{table} ADD COLUMN {column} {sqlType}{defaultClause}{nullSql}{pkClause}{identityClause};";
     }
 
     public static string BuildDropColumn(string schema, string table, string column)
-        => $"ALTER TABLE {schema}.{table} DROP COLUMN IF EXISTS {column};";
+    {
+        return $"ALTER TABLE {schema}.{table} DROP COLUMN IF EXISTS {column};";
+    }
 
     public static string BuildAlterColumnType(string schema, string table, string column, string sqlType)
-        => $"ALTER TABLE {schema}.{table} ALTER COLUMN {column} TYPE {sqlType};";
+    {
+        return $"ALTER TABLE {schema}.{table} ALTER COLUMN {column} TYPE {sqlType};";
+    }
 
     public static string BuildAlterNullability(string schema, string table, string column, bool isNullable)
-        => isNullable
+    {
+        return isNullable
             ? $"ALTER TABLE {schema}.{table} ALTER COLUMN {column} DROP NOT NULL;"
             : $"ALTER TABLE {schema}.{table} ALTER COLUMN {column} SET NOT NULL;";
+    }
 
     public static string BuildSetDefault(string schema, string table, string column, string defaultSql)
-        => $"ALTER TABLE {schema}.{table} ALTER COLUMN {column} SET DEFAULT {defaultSql};";
+    {
+        return $"ALTER TABLE {schema}.{table} ALTER COLUMN {column} SET DEFAULT {defaultSql};";
+    }
 
     public static string BuildDropDefault(string schema, string table, string column)
-        => $"ALTER TABLE {schema}.{table} ALTER COLUMN {column} DROP DEFAULT;";
+    {
+        return $"ALTER TABLE {schema}.{table} ALTER COLUMN {column} DROP DEFAULT;";
+    }
 
     public static string BuildAddUnique(string schema, string table, string column)
-        => $"ALTER TABLE {schema}.{table} ADD CONSTRAINT {table}_{column}_key UNIQUE ({column});";
+    {
+        return $"ALTER TABLE {schema}.{table} ADD CONSTRAINT {table}_{column}_key UNIQUE ({column});";
+    }
 
     public static string BuildDropConstraint(string schema, string table, string constraintName)
-        => $"ALTER TABLE {schema}.{table} DROP CONSTRAINT IF EXISTS {constraintName};";
+    {
+        return $"ALTER TABLE {schema}.{table} DROP CONSTRAINT IF EXISTS {constraintName};";
+    }
 
     public static string BuildAddForeignKey(
         string schema,
@@ -143,9 +157,11 @@ internal static class MigrationBuilderSql
         string refTable,
         string refColumn,
         OnDeleteBehavior onDelete = OnDeleteBehavior.NoAction)
-        => $"ALTER TABLE {schema}.{table} ADD CONSTRAINT {constraintName} " +
-           $"FOREIGN KEY ({column}) REFERENCES {refSchema}.{refTable}({refColumn}) " +
-           $"ON DELETE {onDelete.ToSql()};";
+    {
+        return $"ALTER TABLE {schema}.{table} ADD CONSTRAINT {constraintName} " +
+               $"FOREIGN KEY ({column}) REFERENCES {refSchema}.{refTable}({refColumn}) " +
+               $"ON DELETE {onDelete.ToSql()};";
+    }
 
     private static string FormatValue(object value)
     {

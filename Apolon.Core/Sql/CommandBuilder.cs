@@ -26,7 +26,7 @@ public class CommandBuilder<T> where T : class
 
         var setClause = string.Join(", ", columns.Select((c, i) => $"{c.ColumnName} = @p{i}"));
         var values = columns.Select(c => c.Property.GetValue(entity)).ToList();
-        
+
         var sql = $"UPDATE {_metadata.Schema}.{_metadata.TableName} SET {setClause} WHERE {pk.ColumnName} = @pk";
         return (sql, values, pkValue);
     }

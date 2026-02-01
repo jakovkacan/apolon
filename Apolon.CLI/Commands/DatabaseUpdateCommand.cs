@@ -1,5 +1,4 @@
 ﻿using System.CommandLine;
-using System.CommandLine.Invocation;
 using Apolon.CLI.Services;
 
 namespace Apolon.CLI.Commands;
@@ -8,7 +7,8 @@ internal static class DatabaseUpdateCommand
 {
     public static Command Create()
     {
-        var command = new Command("update", "Apply pending migrations to the database or rollback to a specific migration");
+        var command = new Command("update",
+            "Apply pending migrations to the database or rollback to a specific migration");
 
         var targetMigrationArg = new Argument<string?>(
             "target-migration",
@@ -16,20 +16,20 @@ internal static class DatabaseUpdateCommand
             "Target migration name (optional). If specified and older than current, will rollback. If newer or not applied, will apply up to that migration.");
 
         var connectionStringOption = new Option<string?>(
-            aliases: ["--connection-string", "-c"],
-            getDefaultValue: () => null,
-            description: "Database connection string (defaults to config)");
+            ["--connection-string", "-c"],
+            () => null,
+            "Database connection string (defaults to config)");
 
         var migrationsPathOption = new Option<string?>(
-            aliases: ["--migrations-path", "-m"],
-            getDefaultValue: () => null,
-            description: "Path to migrations directory (defaults to config)");
+            ["--migrations-path", "-m"],
+            () => null,
+            "Path to migrations directory (defaults to config)");
 
         command.AddArgument(targetMigrationArg);
         command.AddOption(connectionStringOption);
         command.AddOption(migrationsPathOption);
 
-        command.SetHandler(async (InvocationContext context) =>
+        command.SetHandler(async context =>
         {
             var targetMigration = context.ParseResult.GetValueForArgument(targetMigrationArg);
             var connectionStringOverride = context.ParseResult.GetValueForOption(connectionStringOption);
@@ -51,21 +51,17 @@ internal static class DatabaseUpdateCommand
 
                 // Determine if this is a rollback or forward migration
                 if (!string.IsNullOrEmpty(targetMigration))
-                {
                     // Check if target is already applied (rollback scenario)
                     // This will be determined inside the executor
                     await MigrationExecutor.ExecuteMigrationsAsync(
                         connectionString,
                         migrationsPath,
                         targetMigration);
-                }
                 else
-                {
                     // Apply all pending migrations
                     await MigrationExecutor.ExecuteMigrationsAsync(
                         connectionString,
                         migrationsPath);
-                }
 
                 context.ExitCode = 0;
             }
@@ -76,9 +72,7 @@ internal static class DatabaseUpdateCommand
                 Console.ResetColor();
 
                 if (ex.InnerException != null)
-                {
                     await Console.Error.WriteLineAsync($"Inner exception: {ex.InnerException.Message}");
-                }
 
                 context.ExitCode = 1;
             }
@@ -94,15 +88,16 @@ internal static class DatabaseUpdateCommand
         var passwordIndex = masked.IndexOf("Password=", StringComparison.OrdinalIgnoreCase);
 
         if (passwordIndex < 0) return masked;
-        
+
         var start = passwordIndex + "Password=".Length;
         var end = masked.IndexOf(';', start);
-            
+
         if (end < 0)
             end = masked.Length;
-            
+
         var passwordLength = end - start;
-        masked = string.Concat(masked.AsSpan()[..start], new string('*', Math.Min(passwordLength, 8)), masked.AsSpan(end));
+        masked = string.Concat(masked.AsSpan()[..start], new string('*', Math.Min(passwordLength, 8)),
+            masked.AsSpan(end));
 
         return masked;
     }

@@ -1,8 +1,10 @@
 ﻿using System.Collections;
+using System.Data;
 using System.Data.Common;
 using Apolon.Core.Exceptions;
 using Apolon.Core.Sql;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace Apolon.Core.DataAccess;
 
@@ -10,8 +12,16 @@ internal class DbConnectionNpgsql(string connectionString) : IDbConnection, IAsy
 {
     private NpgsqlConnection? _connection;
     private NpgsqlTransaction? _transaction;
+    private bool CanConnect => _connection?.State == ConnectionState.Open;
+
+    public ValueTask DisposeAsync()
+    {
+        _transaction?.DisposeAsync();
+        return _connection?.DisposeAsync() ?? ValueTask.CompletedTask;
+    }
+
     public string ConnectionString { get; } = connectionString;
-    public System.Data.ConnectionState State => _connection?.State ?? System.Data.ConnectionState.Closed;
+    public ConnectionState State => _connection?.State ?? ConnectionState.Closed;
 
     public void OpenConnection()
     {
@@ -39,30 +49,31 @@ internal class DbConnectionNpgsql(string connectionString) : IDbConnection, IAsy
 
     public DbCommand CreateCommand(string sql)
     {
-        if (_connection?.State != System.Data.ConnectionState.Open)
+        if (!CanConnect)
             OpenConnection();
 
         var command = _connection?.CreateCommand();
-        
+
         if (command == null) throw new OrmException("Could not create command");
-        
+
         command.CommandText = sql;
         command.Transaction = _transaction;
-            
+
         return command;
     }
-    
+
     public void AddParameter(DbCommand command, string name, object value)
     {
         var parameter = (NpgsqlParameter)command.CreateParameter();
         parameter.ParameterName = name;
-        parameter.Value = value ?? DBNull.Value;
+        parameter.Value = value;
 
         if (value is IEnumerable and not string)
         {
             // Only set NpgsqlDbType if it's an array/collection
             var elementType = GetNpgsqlDbType(value);
-            parameter.NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Array | elementType;
+            // ReSharper disable once BitwiseOperatorOnEnumWithoutFlags
+            parameter.NpgsqlDbType = NpgsqlDbType.Array | elementType;
         }
         // For non-enumerables, let Npgsql infer the type naturally from parameter.Value
 
@@ -72,74 +83,28 @@ internal class DbConnectionNpgsql(string connectionString) : IDbConnection, IAsy
     public DbCommand CreateCommandWithParameters(string sql, List<ParameterMapping> parameters)
     {
         var command = CreateCommand(sql);
-        foreach (var param in parameters)
-        {
-            AddParameter(command, param.Name, param.Value);
-        }
-            
+        foreach (var param in parameters) AddParameter(command, param.Name, param.Value);
+
         return command;
-    }
-    
-    private static NpgsqlTypes.NpgsqlDbType GetNpgsqlDbType(object value)
-    {
-        var type = value.GetType();
-        Type? elementType = null;
-
-        if (type.IsArray)
-        {
-            elementType = type.GetElementType();
-        }
-        else if (type.IsGenericType)
-        {
-            elementType = type.GetGenericArguments().FirstOrDefault();
-        }
-        
-        // If the type is 'object', peek at the first element to find the real type
-        if (elementType == null || elementType == typeof(object))
-        {
-            if (value is IEnumerable enumerable)
-            {
-                var firstItem = enumerable.Cast<object>().FirstOrDefault(x => x != null);
-                if (firstItem != null)
-                {
-                    elementType = firstItem.GetType();
-                }
-            }
-        }
-
-        if (elementType == null) return NpgsqlTypes.NpgsqlDbType.Text;
-
-        // Handle Nullable types by getting the underlying type
-        var underlyingType = Nullable.GetUnderlyingType(elementType) ?? elementType;
-
-        if (underlyingType == typeof(int)) return NpgsqlTypes.NpgsqlDbType.Integer;
-        if (underlyingType == typeof(long)) return NpgsqlTypes.NpgsqlDbType.Bigint;
-        if (underlyingType == typeof(string)) return NpgsqlTypes.NpgsqlDbType.Text;
-        if (underlyingType == typeof(Guid)) return NpgsqlTypes.NpgsqlDbType.Uuid;
-        if (underlyingType == typeof(DateTime)) return NpgsqlTypes.NpgsqlDbType.Timestamp;
-        if (underlyingType == typeof(bool)) return NpgsqlTypes.NpgsqlDbType.Boolean;
-        if (underlyingType == typeof(double) || underlyingType == typeof(float)) return NpgsqlTypes.NpgsqlDbType.Double;
-        if (underlyingType == typeof(decimal)) return NpgsqlTypes.NpgsqlDbType.Numeric;
-        
-        return NpgsqlTypes.NpgsqlDbType.Text;
     }
 
     public DbDataReader ExecuteReader(DbCommand command)
     {
         return command.ExecuteReader();
     }
-    
+
     public Task<DbDataReader> ExecuteReaderAsync(DbCommand command)
     {
         return command.ExecuteReaderAsync();
     }
-    
+
     public int ExecuteNonQuery(DbCommand command)
     {
         return command.ExecuteNonQuery();
     }
-    
-    public Task<int> ExecuteNonQueryAsync(DbCommand command)    {
+
+    public Task<int> ExecuteNonQueryAsync(DbCommand command)
+    {
         return command.ExecuteNonQueryAsync();
     }
 
@@ -147,7 +112,7 @@ internal class DbConnectionNpgsql(string connectionString) : IDbConnection, IAsy
     {
         return command.ExecuteScalar();
     }
-    
+
     public Task<object?> ExecuteScalarAsync(DbCommand command)
     {
         return command.ExecuteScalarAsync();
@@ -155,7 +120,7 @@ internal class DbConnectionNpgsql(string connectionString) : IDbConnection, IAsy
 
     public void BeginTransaction()
     {
-        if (_connection?.State != System.Data.ConnectionState.Open)
+        if (!CanConnect)
             OpenConnection();
 
         _transaction = _connection?.BeginTransaction();
@@ -163,7 +128,7 @@ internal class DbConnectionNpgsql(string connectionString) : IDbConnection, IAsy
 
     public async Task BeginTransactionAsync(CancellationToken ct = default)
     {
-        if (_connection?.State != System.Data.ConnectionState.Open)
+        if (!CanConnect)
             await OpenConnectionAsync();
 
         _transaction = await _connection!.BeginTransactionAsync(ct);
@@ -175,7 +140,7 @@ internal class DbConnectionNpgsql(string connectionString) : IDbConnection, IAsy
         _transaction?.Dispose();
         _transaction = null;
     }
-    
+
     public async Task CommitTransactionAsync(CancellationToken ct = default)
     {
         if (_transaction == null) return;
@@ -190,7 +155,7 @@ internal class DbConnectionNpgsql(string connectionString) : IDbConnection, IAsy
         _transaction?.Dispose();
         _transaction = null;
     }
-    
+
     public async Task RollbackTransactionAsync(CancellationToken ct = default)
     {
         if (_transaction == null) return;
@@ -205,9 +170,37 @@ internal class DbConnectionNpgsql(string connectionString) : IDbConnection, IAsy
         _connection?.Dispose();
     }
 
-    public ValueTask DisposeAsync()
+    private static NpgsqlDbType GetNpgsqlDbType(object value)
     {
-        _transaction?.DisposeAsync();
-        return _connection?.DisposeAsync() ?? ValueTask.CompletedTask;
+        var type = value.GetType();
+        Type? elementType = null;
+
+        if (type.IsArray)
+            elementType = type.GetElementType();
+        else if (type.IsGenericType) elementType = type.GetGenericArguments().FirstOrDefault();
+
+        // If the type is 'object', peek at the first element to find the real type
+        if (elementType == null || elementType == typeof(object))
+            if (value is IEnumerable enumerable)
+            {
+                var firstItem = enumerable.Cast<object>().FirstOrDefault(x => x != null);
+                if (firstItem != null) elementType = firstItem.GetType();
+            }
+
+        if (elementType == null) return NpgsqlDbType.Text;
+
+        // Handle Nullable types by getting the underlying type
+        var underlyingType = Nullable.GetUnderlyingType(elementType) ?? elementType;
+
+        if (underlyingType == typeof(int)) return NpgsqlDbType.Integer;
+        if (underlyingType == typeof(long)) return NpgsqlDbType.Bigint;
+        if (underlyingType == typeof(string)) return NpgsqlDbType.Text;
+        if (underlyingType == typeof(Guid)) return NpgsqlDbType.Uuid;
+        if (underlyingType == typeof(DateTime)) return NpgsqlDbType.Timestamp;
+        if (underlyingType == typeof(bool)) return NpgsqlDbType.Boolean;
+        if (underlyingType == typeof(double) || underlyingType == typeof(float)) return NpgsqlDbType.Double;
+        if (underlyingType == typeof(decimal)) return NpgsqlDbType.Numeric;
+
+        return NpgsqlDbType.Text;
     }
 }

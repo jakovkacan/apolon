@@ -1,6 +1,4 @@
-﻿using System.Linq.Expressions;
-using Apolon.Core.Attributes;
-using Apolon.Core.Exceptions;
+﻿using Apolon.Core.Attributes;
 using Apolon.Core.Sql;
 
 namespace Apolon.Core.Tests.Sql;
@@ -519,8 +517,7 @@ public class QueryBuilderTests
 [Table("test_entity", Schema = "public")]
 public class QueryTestEntity
 {
-    [PrimaryKey]
-    public int Id { get; set; }
+    [PrimaryKey] public int Id { get; set; }
 
     public string Name { get; set; } = string.Empty;
 
@@ -530,8 +527,7 @@ public class QueryTestEntity
 [Table("nullable_entity", Schema = "public")]
 public class QueryTestNullableEntity
 {
-    [PrimaryKey]
-    public int Id { get; set; }
+    [PrimaryKey] public int Id { get; set; }
 
     public string? Description { get; set; }
 }
@@ -539,8 +535,7 @@ public class QueryTestNullableEntity
 [Table("custom_table", Schema = "custom_schema")]
 public class QueryTestCustomSchemaEntity
 {
-    [PrimaryKey]
-    public int Id { get; set; }
+    [PrimaryKey] public int Id { get; set; }
 
     public string Name { get; set; } = string.Empty;
 }
@@ -548,9 +543,7 @@ public class QueryTestCustomSchemaEntity
 [Table("column_entity", Schema = "public")]
 public class QueryTestColumnEntity
 {
-    [PrimaryKey]
-    public int Id { get; set; }
+    [PrimaryKey] public int Id { get; set; }
 
-    [Column("first_name")]
-    public string FirstName { get; set; } = string.Empty;
+    [Column("first_name")] public string FirstName { get; set; } = string.Empty;
 }

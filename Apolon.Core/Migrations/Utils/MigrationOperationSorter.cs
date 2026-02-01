@@ -3,13 +3,13 @@ using Apolon.Core.Migrations.Models;
 namespace Apolon.Core.Migrations.Utils;
 
 /// <summary>
-/// Sorts migration operations to respect dependency order, particularly for foreign key constraints.
-/// Ensures tables are created before they are referenced, and constraints are added in the correct order.
+///     Sorts migration operations to respect dependency order, particularly for foreign key constraints.
+///     Ensures tables are created before they are referenced, and constraints are added in the correct order.
 /// </summary>
 internal static class MigrationOperationSorter
 {
     /// <summary>
-    /// Sorts migration operations to ensure safe execution order.
+    ///     Sorts migration operations to ensure safe execution order.
     /// </summary>
     /// <param name="operations">The unsorted operations.</param>
     /// <returns>Operations sorted by dependency order.</returns>
@@ -67,8 +67,8 @@ internal static class MigrationOperationSorter
     }
 
     /// <summary>
-    /// Topologically sorts CreateTable operations based on foreign key dependencies.
-    /// Tables with no dependencies come first, tables that reference others come later.
+    ///     Topologically sorts CreateTable operations based on foreign key dependencies.
+    ///     Tables with no dependencies come first, tables that reference others come later.
     /// </summary>
     private static List<MigrationOperation> TopologicalSortTables(
         List<MigrationOperation> createTableOps,
@@ -97,35 +97,22 @@ internal static class MigrationOperationSorter
             if (!dependencies.ContainsKey(fromKey) || !dependencies.ContainsKey(toKey)) continue;
 
             // Skip self-references (will be handled as deferred constraints)
-            if (fromKey != toKey)
-            {
-                dependencies[fromKey].Add(toKey);
-            }
+            if (fromKey != toKey) dependencies[fromKey].Add(toKey);
         }
 
         // Perform topological sort using Kahn's algorithm
         var sorted = new List<MigrationOperation>();
         var inDegree = new Dictionary<(string Schema, string Table), int>();
 
-        foreach (var key in dependencies.Keys)
-        {
-            inDegree[key] = 0;
-        }
+        foreach (var key in dependencies.Keys) inDegree[key] = 0;
 
         foreach (var deps in dependencies.Values)
-        {
-            foreach (var dep in deps)
-            {
-                if (inDegree.TryGetValue(dep, out var value))
-                    inDegree[dep] = ++value;
-            }
-        }
+        foreach (var dep in deps)
+            if (inDegree.TryGetValue(dep, out var value))
+                inDegree[dep] = ++value;
 
         var queue = new Queue<(string Schema, string Table)>();
-        foreach (var kvp in inDegree.Where(kvp => kvp.Value == 0))
-        {
-            queue.Enqueue(kvp.Key);
-        }
+        foreach (var kvp in inDegree.Where(kvp => kvp.Value == 0)) queue.Enqueue(kvp.Key);
 
         while (queue.Count > 0)
         {
@@ -138,10 +125,7 @@ internal static class MigrationOperationSorter
                 if (!inDegree.TryGetValue(dependent, out var value)) continue;
 
                 inDegree[dependent] = --value;
-                if (inDegree[dependent] == 0)
-                {
-                    queue.Enqueue(dependent);
-                }
+                if (inDegree[dependent] == 0) queue.Enqueue(dependent);
             }
         }
 
@@ -157,7 +141,7 @@ internal static class MigrationOperationSorter
     }
 
     /// <summary>
-    /// Sorts AddColumn operations by the order tables were created.
+    ///     Sorts AddColumn operations by the order tables were created.
     /// </summary>
     private static List<MigrationOperation> SortColumnsByTableOrder(
         List<MigrationOperation> columnOps,
@@ -177,8 +161,8 @@ internal static class MigrationOperationSorter
     }
 
     /// <summary>
-    /// Sorts foreign key operations to avoid referencing tables before their FKs are set up.
-    /// This is a best-effort sort; circular FKs will be added in original order.
+    ///     Sorts foreign key operations to avoid referencing tables before their FKs are set up.
+    ///     This is a best-effort sort; circular FKs will be added in original order.
     /// </summary>
     private static List<MigrationOperation> TopologicalSortForeignKeys(
         List<MigrationOperation> fkOps,

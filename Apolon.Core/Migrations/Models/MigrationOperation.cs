@@ -39,7 +39,9 @@ public sealed record MigrationOperation(
 )
 {
     public string? GetSqlType()
-        => BuildSqlType(SqlType, CharacterMaximumLength, NumericPrecision, NumericScale, DateTimePrecision);
+    {
+        return BuildSqlType(SqlType, CharacterMaximumLength, NumericPrecision, NumericScale, DateTimePrecision);
+    }
 
     public static string? BuildSqlType(
         string? baseType,
@@ -58,11 +60,9 @@ public sealed record MigrationOperation(
             return $"{upperType}({characterMaximumLength})";
 
         if (numericPrecision is not null && IsNumericType(normalized))
-        {
             return numericScale is not null
                 ? $"{upperType}({numericPrecision},{numericScale})"
                 : $"{upperType}({numericPrecision})";
-        }
 
         if (dateTimePrecision is not null && IsDateTimeType(normalized))
             return $"{upperType}({dateTimePrecision})";
@@ -81,7 +81,8 @@ public sealed record MigrationOperation(
 
         if (Column is not null) parts.Add($"{nameof(Column)}: {Column}");
         if (SqlType is not null) parts.Add($"{nameof(SqlType)}: {SqlType}");
-        if (CharacterMaximumLength is not null) parts.Add($"{nameof(CharacterMaximumLength)}: {CharacterMaximumLength}");
+        if (CharacterMaximumLength is not null)
+            parts.Add($"{nameof(CharacterMaximumLength)}: {CharacterMaximumLength}");
         if (NumericPrecision is not null) parts.Add($"{nameof(NumericPrecision)}: {NumericPrecision}");
         if (NumericScale is not null) parts.Add($"{nameof(NumericScale)}: {NumericScale}");
         if (DateTimePrecision is not null) parts.Add($"{nameof(DateTimePrecision)}: {DateTimePrecision}");
@@ -100,11 +101,18 @@ public sealed record MigrationOperation(
     }
 
     private static bool IsLengthType(string normalizedType)
-        => normalizedType is "varchar" or "char" or "character" or "character varying" or "varbit" or "bit varying" or "bit";
+    {
+        return normalizedType is "varchar" or "char" or "character" or "character varying" or "varbit" or "bit varying"
+            or "bit";
+    }
 
     private static bool IsNumericType(string normalizedType)
-        => normalizedType is "numeric" or "decimal";
+    {
+        return normalizedType is "numeric" or "decimal";
+    }
 
     private static bool IsDateTimeType(string normalizedType)
-        => normalizedType is "timestamp" or "timestamptz" or "time" or "timetz";
+    {
+        return normalizedType is "timestamp" or "timestamptz" or "time" or "timetz";
+    }
 }

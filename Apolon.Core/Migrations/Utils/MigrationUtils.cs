@@ -1,5 +1,4 @@
-﻿using System.Reflection;
-using Apolon.Core.Attributes;
+﻿using Apolon.Core.Attributes;
 using Apolon.Core.Migrations.Models;
 using Apolon.Core.Sql;
 using Microsoft.CodeAnalysis;
@@ -36,13 +35,13 @@ internal static class MigrationUtils
                 operation.Column!),
             MigrationOperationType.DropConstraint => MigrationBuilderSql.BuildDropConstraint(operation.Schema,
                 operation.Table, operation.ConstraintName!),
-            MigrationOperationType.AddForeignKey => MigrationBuilderSql.BuildAddForeignKey(schema: operation.Schema,
-                table: operation.Table, column: operation.Column!,
-                constraintName: operation.ConstraintName ?? $"{operation.Table}_{operation.Column}_fkey",
-                refSchema: operation.RefSchema ?? "public",
-                refTable: operation.RefTable ?? throw new InvalidOperationException("Missing ref table"),
-                refColumn: operation.RefColumn ?? "id",
-                onDelete: OnDeleteBehaviorExtensions.ParseOrDefault(operation.OnDeleteRule)),
+            MigrationOperationType.AddForeignKey => MigrationBuilderSql.BuildAddForeignKey(operation.Schema,
+                operation.Table, operation.Column!,
+                operation.ConstraintName ?? $"{operation.Table}_{operation.Column}_fkey",
+                operation.RefSchema ?? "public",
+                operation.RefTable ?? throw new InvalidOperationException("Missing ref table"),
+                operation.RefColumn ?? "id",
+                OnDeleteBehaviorExtensions.ParseOrDefault(operation.OnDeleteRule)),
             _ => throw new InvalidOperationException($"Unsupported migration operation type: {operation.Type}")
         };
 
@@ -56,8 +55,9 @@ internal static class MigrationUtils
 
         return sortedOperations.Select(ConvertOperationToSql).ToList();
     }
-    
-    public static IReadOnlyList<MigrationOperation> ExtractOperationsFromMigrationTypes(IEnumerable<Type> migrationTypes)
+
+    public static IReadOnlyList<MigrationOperation> ExtractOperationsFromMigrationTypes(
+        IEnumerable<Type> migrationTypes)
     {
         return migrationTypes
             .Select(ExtractOperationsFromMigration)
@@ -66,7 +66,7 @@ internal static class MigrationUtils
     }
 
     /// <summary>
-    /// Extracts MigrationOperations from a migration type by reading its source file and parsing the Up method.
+    ///     Extracts MigrationOperations from a migration type by reading its source file and parsing the Up method.
     /// </summary>
     /// <param name="migrationType">The Type of the migration class.</param>
     /// <returns>List of operations performed in the Up method.</returns>
@@ -77,15 +77,16 @@ internal static class MigrationUtils
         var assemblyDirectory = Path.GetDirectoryName(assemblyLocation);
 
         if (string.IsNullOrEmpty(assemblyDirectory))
-            throw new InvalidOperationException($"Could not determine assembly directory for type {migrationType.FullName}");
-        
+            throw new InvalidOperationException(
+                $"Could not determine assembly directory for type {migrationType.FullName}");
+
         // Try to find the source file
         // Look in typical migration folders: Migrations, Data/Migrations, etc.
         var possibleDirectories = new[]
         {
             Path.Combine(assemblyDirectory, "..", "..", "..", "Migrations"),
             Path.Combine(assemblyDirectory, "..", "..", "..", "Data", "Migrations"),
-            Path.Combine(assemblyDirectory, "Migrations"),
+            Path.Combine(assemblyDirectory, "Migrations")
         };
 
         string? sourceFilePath = null;
@@ -111,7 +112,7 @@ internal static class MigrationUtils
     }
 
     /// <summary>
-    /// Extracts MigrationOperations from generated migration file source code by parsing the Up method.
+    ///     Extracts MigrationOperations from generated migration file source code by parsing the Up method.
     /// </summary>
     /// <param name="migrationFileContent">The C# source code of the migration file.</param>
     /// <returns>List of operations performed in the Up method.</returns>
@@ -164,7 +165,8 @@ internal static class MigrationUtils
 
     private static void ParseInvocation(InvocationExpressionSyntax invocation, MigrationBuilder builder)
     {
-        if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess || memberAccess.Expression.ToString() != "migrationBuilder")
+        if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
+            memberAccess.Expression.ToString() != "migrationBuilder")
             return;
 
         var methodName = memberAccess.Name.Identifier.Text;
@@ -189,15 +191,15 @@ internal static class MigrationUtils
 
             case "AddColumn":
                 builder.AddColumn(
-                    schema: GetStringArgument(arguments, "schema") ?? GetStringArgument(arguments, 0),
-                    table: GetStringArgument(arguments, "table") ?? GetStringArgument(arguments, 1),
-                    column: GetStringArgument(arguments, "column") ?? GetStringArgument(arguments, 2),
-                    sqlType: GetStringArgument(arguments, "sqlType") ?? GetStringArgument(arguments, 3),
-                    isNullable: GetBoolArgument(arguments, "isNullable") ?? GetBoolArgument(arguments, 4) ?? false,
-                    defaultSql: GetStringArgument(arguments, "defaultSql"),
-                    isPrimaryKey: GetBoolArgument(arguments, "isPrimaryKey") ?? false,
-                    isIdentity: GetBoolArgument(arguments, "isIdentity") ?? false,
-                    identityGeneration: GetStringArgument(arguments, "identityGeneration"));
+                    GetStringArgument(arguments, "schema") ?? GetStringArgument(arguments, 0),
+                    GetStringArgument(arguments, "table") ?? GetStringArgument(arguments, 1),
+                    GetStringArgument(arguments, "column") ?? GetStringArgument(arguments, 2),
+                    GetStringArgument(arguments, "sqlType") ?? GetStringArgument(arguments, 3),
+                    GetBoolArgument(arguments, "isNullable") ?? GetBoolArgument(arguments, 4) ?? false,
+                    GetStringArgument(arguments, "defaultSql"),
+                    GetBoolArgument(arguments, "isPrimaryKey") ?? false,
+                    GetBoolArgument(arguments, "isIdentity") ?? false,
+                    GetStringArgument(arguments, "identityGeneration"));
                 break;
 
             case "DropColumn":
@@ -254,14 +256,14 @@ internal static class MigrationUtils
 
             case "AddForeignKey":
                 builder.AddForeignKey(
-                    schema: GetStringArgument(arguments, "schema") ?? GetStringArgument(arguments, 0),
-                    table: GetStringArgument(arguments, "table") ?? GetStringArgument(arguments, 1),
-                    column: GetStringArgument(arguments, "column") ?? GetStringArgument(arguments, 2),
-                    constraintName: GetStringArgument(arguments, "constraintName") ?? GetStringArgument(arguments, 3),
-                    refSchema: GetStringArgument(arguments, "refSchema") ?? GetStringArgument(arguments, 4),
-                    refTable: GetStringArgument(arguments, "refTable") ?? GetStringArgument(arguments, 5),
-                    refColumn: GetStringArgument(arguments, "refColumn") ?? GetStringArgument(arguments, 6),
-                    onDeleteRule: GetStringArgument(arguments, "onDeleteRule") ?? GetStringArgument(arguments, 7));
+                    GetStringArgument(arguments, "schema") ?? GetStringArgument(arguments, 0),
+                    GetStringArgument(arguments, "table") ?? GetStringArgument(arguments, 1),
+                    GetStringArgument(arguments, "column") ?? GetStringArgument(arguments, 2),
+                    GetStringArgument(arguments, "constraintName") ?? GetStringArgument(arguments, 3),
+                    GetStringArgument(arguments, "refSchema") ?? GetStringArgument(arguments, 4),
+                    GetStringArgument(arguments, "refTable") ?? GetStringArgument(arguments, 5),
+                    GetStringArgument(arguments, "refColumn") ?? GetStringArgument(arguments, 6),
+                    GetStringArgument(arguments, "onDeleteRule") ?? GetStringArgument(arguments, 7));
                 break;
         }
     }
@@ -281,24 +283,17 @@ internal static class MigrationUtils
         builder.CreateTable(schema, tableName);
 
         // Parse columns lambda
-        var columnsLambda = arguments.FirstOrDefault(a => a.NameColon?.Name.Identifier.Text == "columns" || arguments.IndexOf(a) == 1);
+        var columnsLambda = arguments.FirstOrDefault(a =>
+            a.NameColon?.Name.Identifier.Text == "columns" || arguments.IndexOf(a) == 1);
         if (columnsLambda?.Expression is SimpleLambdaExpressionSyntax columnsSimpleLambda)
-        {
             if (columnsSimpleLambda.ExpressionBody is AnonymousObjectCreationExpressionSyntax columnsAnonymousObject)
-            {
                 ParseColumnDefinitions(columnsAnonymousObject, schema, tableName, builder);
-            }
-        }
 
         // Parse constraints lambda
         var constraintsLambda = arguments.FirstOrDefault(a => a.NameColon?.Name.Identifier.Text == "constraints");
         if (constraintsLambda?.Expression is SimpleLambdaExpressionSyntax constraintsSimpleLambda)
-        {
             if (constraintsSimpleLambda.Body is BlockSyntax constraintsBlock)
-            {
                 ParseConstraints(constraintsBlock, schema, tableName, builder);
-            }
-        }
     }
 
     private static void ParseColumnDefinitions(
@@ -322,20 +317,17 @@ internal static class MigrationUtils
                 continue;
 
             builder.AddColumn(
-                schema: schema,
-                table: tableName,
-                column: columnName,
-                sqlType: columnInfo.SqlType ?? "TEXT",
-                isNullable: columnInfo.IsNullable,
-                defaultSql: columnInfo.DefaultSql,
-                isPrimaryKey: columnInfo.IsPrimaryKey,
-                isIdentity: columnInfo.IsIdentity,
-                identityGeneration: columnInfo.IdentityGeneration);
+                schema,
+                tableName,
+                columnName,
+                columnInfo.SqlType ?? "TEXT",
+                columnInfo.IsNullable,
+                columnInfo.DefaultSql,
+                columnInfo.IsPrimaryKey,
+                columnInfo.IsIdentity,
+                columnInfo.IdentityGeneration);
 
-            if (columnInfo.IsUnique)
-            {
-                builder.AddUnique(schema, tableName, columnName);
-            }
+            if (columnInfo.IsUnique) builder.AddUnique(schema, tableName, columnName);
         }
     }
 
@@ -349,7 +341,6 @@ internal static class MigrationUtils
         while (current != null)
         {
             if (current is InvocationExpressionSyntax invocation)
-            {
                 // Check if this is table.Column<T>()
                 if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
                 {
@@ -359,9 +350,7 @@ internal static class MigrationUtils
                     {
                         // Parse Column<T>() arguments
                         ParseColumnArguments(invocation.ArgumentList.Arguments, info);
-
                         // Move to the parent expression (the chain continues upward)
-                        break;
                     }
                     else
                     {
@@ -373,7 +362,6 @@ internal static class MigrationUtils
                         continue;
                     }
                 }
-            }
 
             break;
         }
@@ -390,7 +378,8 @@ internal static class MigrationUtils
             info.IsNullable = nullable.Value;
     }
 
-    private static void ParseFluentMethod(string methodName, SeparatedSyntaxList<ArgumentSyntax> arguments, ColumnInfo info)
+    private static void ParseFluentMethod(string methodName, SeparatedSyntaxList<ArgumentSyntax> arguments,
+        ColumnInfo info)
     {
         switch (methodName)
         {
@@ -402,6 +391,7 @@ internal static class MigrationUtils
                     info.IsIdentity = true;
                     info.IdentityGeneration = annotationValue;
                 }
+
                 break;
 
             case "HasDefaultValueSql":
@@ -422,7 +412,8 @@ internal static class MigrationUtils
         }
     }
 
-    private static void ParseConstraints(BlockSyntax constraintsBlock, string schema, string tableName, MigrationBuilder builder)
+    private static void ParseConstraints(BlockSyntax constraintsBlock, string schema, string tableName,
+        MigrationBuilder builder)
     {
         foreach (var statement in constraintsBlock.Statements)
         {
@@ -469,17 +460,15 @@ internal static class MigrationUtils
         var onDelete = GetStringArgument(arguments, "onDelete");
 
         if (constraintName != null && column != null && refTable != null && refColumn != null)
-        {
             builder.AddForeignKey(
-                schema: schema,
-                table: tableName,
-                column: column,
-                constraintName: constraintName,
-                refSchema: principalSchema,
-                refTable: refTable,
-                refColumn: refColumn,
-                onDeleteRule: onDelete);
-        }
+                schema,
+                tableName,
+                column,
+                constraintName,
+                principalSchema,
+                refTable,
+                refColumn,
+                onDelete);
     }
 
     private static string? ExtractColumnFromLambda(SeparatedSyntaxList<ArgumentSyntax> arguments, int index)
@@ -489,12 +478,8 @@ internal static class MigrationUtils
 
         var argument = arguments[index];
         if (argument.Expression is SimpleLambdaExpressionSyntax lambda)
-        {
             if (lambda.ExpressionBody is MemberAccessExpressionSyntax memberAccess)
-            {
                 return memberAccess.Name.Identifier.Text;
-            }
-        }
 
         return null;
     }
@@ -516,9 +501,7 @@ internal static class MigrationUtils
     private static string? GetStringValue(ExpressionSyntax? expression)
     {
         if (expression is LiteralExpressionSyntax literal && literal.Token.Value is string stringValue)
-        {
             return stringValue;
-        }
 
         return null;
     }

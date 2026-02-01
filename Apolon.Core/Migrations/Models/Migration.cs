@@ -1,5 +1,3 @@
-using Apolon.Core.Migrations;
-
 namespace Apolon.Core.Migrations.Models;
 
 public abstract class Migration

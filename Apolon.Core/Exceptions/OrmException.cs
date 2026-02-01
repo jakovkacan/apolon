@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Apolon.Core.Exceptions;
+﻿namespace Apolon.Core.Exceptions;
 
 public class OrmException : Exception
 {
@@ -8,7 +6,7 @@ public class OrmException : Exception
     {
     }
 
-    public OrmException(string message, Exception innerException) : base(message, innerException)
+    protected OrmException(string message, Exception innerException) : base(message, innerException)
     {
     }
 }
