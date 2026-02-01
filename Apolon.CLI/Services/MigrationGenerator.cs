@@ -55,14 +55,6 @@ internal static class MigrationGenerator
             return string.Empty;
         }
 
-        // Display operations
-        Console.WriteLine("\nOperations to be generated:");
-        foreach (var op in operations)
-        {
-            Console.WriteLine($"  - {op.Type}: {op.Schema}.{op.Table}" +
-                              (op.Column != null ? $".{op.Column}" : ""));
-        }
-
         Console.WriteLine($"\nGenerating migration file: {sanitizedName}");
         var migrationCode =
             MigrationCodeGenerator.GenerateMigrationCode(sanitizedName, operations, namespaceName, committedOperations);

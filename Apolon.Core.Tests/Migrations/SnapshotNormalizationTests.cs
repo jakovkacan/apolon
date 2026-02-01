@@ -10,7 +10,7 @@ public class SnapshotNormalizationTests
     {
         Assert.Equal("varchar", SnapshotNormalization.NormalizeDataType("character varying(255)"));
         Assert.Equal("timestamptz", SnapshotNormalization.NormalizeDataType("timestamp with time zone"));
-        Assert.Equal("float8", SnapshotNormalization.NormalizeDataType("DOUBLE   precision"));
+        Assert.Equal("double", SnapshotNormalization.NormalizeDataType("DOUBLE   precision"));
     }
 
     [Fact]

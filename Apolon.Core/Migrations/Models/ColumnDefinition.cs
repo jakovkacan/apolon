@@ -2,8 +2,9 @@ namespace Apolon.Core.Migrations.Models;
 
 /// <summary>
 /// Represents the complete definition of a database column.
+/// Internal model used by migration fluent API. Use ColumnSchema for public APIs.
 /// </summary>
-public sealed record ColumnDefinition
+internal sealed record ColumnDefinition
 {
     /// <summary>
     /// The name of the column.
@@ -71,7 +72,7 @@ public sealed record ColumnDefinition
     public bool IsUnique { get; init; }
 
     /// <summary>
-    /// Provider-specific annotations (e.g., "SqlServer:Identity" => "1, 1").
+    /// Provider-specific annotations
     /// </summary>
     public IReadOnlyDictionary<string, object>? Annotations { get; init; }
 

@@ -242,6 +242,233 @@ public class SchemaDifferTests
         Assert.Equal("cascade", op.OnDeleteRule);
     }
 
+    [Fact]
+    public void Diff_TableRemoved_ProducesDropTable()
+    {
+        var expected = new SchemaSnapshot([
+            Table("public", "users", Column("id"))
+        ]);
+
+        var actual = new SchemaSnapshot([
+            Table("public", "users", Column("id")),
+            Table("public", "old_table", Column("id"))
+        ]);
+
+        var ops = SchemaDiffer.Diff(expected, actual);
+
+        var op = Assert.Single(ops);
+        Assert.Equal(MigrationOperationType.DropTable, op.Type);
+        Assert.Equal("public", op.Schema);
+        Assert.Equal("old_table", op.Table);
+    }
+
+    [Fact]
+    public void Diff_ColumnRemoved_ProducesDropColumn()
+    {
+        var expected = new SchemaSnapshot([
+            Table("public", "users",
+                Column("id"),
+                Column("name"))
+        ]);
+
+        var actual = new SchemaSnapshot([
+            Table("public", "users",
+                Column("id"),
+                Column("name"),
+                Column("old_column", dataType: "varchar"))
+        ]);
+
+        var ops = SchemaDiffer.Diff(expected, actual);
+
+        var op = Assert.Single(ops);
+        Assert.Equal(MigrationOperationType.DropColumn, op.Type);
+        Assert.Equal("public", op.Schema);
+        Assert.Equal("users", op.Table);
+        Assert.Equal("old_column", op.Column);
+    }
+
+    [Fact]
+    public void Diff_ForeignKeyChanged_ProducesDropConstraintThenAddForeignKey()
+    {
+        var expected = new SchemaSnapshot([
+            Table("public", "checkups", Column("id")),
+            Table("public", "patients", Column("id")),
+            Table("public", "tests",
+                Column("id"),
+                Column(
+                    "patient_id",
+                    isForeignKey: true,
+                    fkName: "fk_tests_patient_id",
+                    refSchema: "public",
+                    refTable: "patients",
+                    refColumn: "id",
+                    fkDelete: "cascade"
+                ))
+        ]);
+
+        var actual = new SchemaSnapshot([
+            Table("public", "checkups", Column("id")),
+            Table("public", "patients", Column("id")),
+            Table("public", "tests",
+                Column("id"),
+                Column(
+                    "patient_id",
+                    isForeignKey: true,
+                    fkName: "fk_tests_patient_id_old",
+                    refSchema: "public",
+                    refTable: "checkups",
+                    refColumn: "id",
+                    fkDelete: "restrict"
+                ))
+        ]);
+
+        var ops = SchemaDiffer.Diff(expected, actual);
+
+        Assert.Collection(ops,
+            op =>
+            {
+                Assert.Equal(MigrationOperationType.DropConstraint, op.Type);
+                Assert.Equal("public", op.Schema);
+                Assert.Equal("tests", op.Table);
+                Assert.Equal("fk_tests_patient_id_old", op.ConstraintName);
+            },
+            op =>
+            {
+                Assert.Equal(MigrationOperationType.AddForeignKey, op.Type);
+                Assert.Equal("public", op.Schema);
+                Assert.Equal("tests", op.Table);
+                Assert.Equal("patient_id", op.Column);
+                Assert.Equal("fk_tests_patient_id", op.ConstraintName);
+                Assert.Equal("public", op.RefSchema);
+                Assert.Equal("patients", op.RefTable);
+                Assert.Equal("id", op.RefColumn);
+                Assert.Equal("cascade", op.OnDeleteRule);
+            });
+    }
+
+    [Fact]
+    public void Diff_WithCommittedOperations_FiltersOutCommittedOps()
+    {
+        var expected = new SchemaSnapshot([
+            Table("public", "users",
+                Column("id"),
+                Column("name"),
+                Column("email"))
+        ]);
+
+        var actual = new SchemaSnapshot([
+            Table("public", "users",
+                Column("id"))
+        ]);
+
+        var committedOps = new List<MigrationOperation>
+        {
+            new(
+                Type: MigrationOperationType.AddColumn,
+                Schema: "public",
+                Table: "users",
+                Column: "name",
+                SqlType: "int4",
+                CharacterMaximumLength: null,
+                NumericPrecision: null,
+                NumericScale: null,
+                DateTimePrecision: null,
+                IsPrimaryKey: false,
+                IsIdentity: false,
+                IdentityGeneration: null,
+                IsNullable: false,
+                DefaultSql: null
+            )
+        };
+
+        var ops = SchemaDiffer.Diff(expected, actual, committedOps);
+
+        // Should only include the email column add, not the name column add
+        var op = Assert.Single(ops);
+        Assert.Equal(MigrationOperationType.AddColumn, op.Type);
+        Assert.Equal("email", op.Column);
+    }
+
+    [Fact]
+    public void Diff_ForeignKeyRemovedWithoutConstraintName_DoesNotDropConstraint()
+    {
+        var expected = new SchemaSnapshot([
+            Table("public", "users", Column("id")),
+            Table("public", "orders",
+                Column("id"),
+                Column("user_id"))
+        ]);
+
+        var actual = new SchemaSnapshot([
+            Table("public", "users", Column("id")),
+            Table("public", "orders",
+                Column("id"),
+                Column(
+                    "user_id",
+                    isForeignKey: true,
+                    fkName: null, // No constraint name
+                    refSchema: "public",
+                    refTable: "users",
+                    refColumn: "id"
+                ))
+        ]);
+
+        var ops = SchemaDiffer.Diff(expected, actual);
+
+        // Should not produce a DropConstraint operation since there's no constraint name
+        Assert.DoesNotContain(ops, op => op.Type == MigrationOperationType.DropConstraint);
+    }
+
+    [Fact]
+    public void Diff_ForeignKeyRemovedWithEmptyConstraintName_DoesNotDropConstraint()
+    {
+        var expected = new SchemaSnapshot([
+            Table("public", "users", Column("id")),
+            Table("public", "orders",
+                Column("id"),
+                Column("user_id"))
+        ]);
+
+        var actual = new SchemaSnapshot([
+            Table("public", "users", Column("id")),
+            Table("public", "orders",
+                Column("id"),
+                Column(
+                    "user_id",
+                    isForeignKey: true,
+                    fkName: "", // Empty constraint name
+                    refSchema: "public",
+                    refTable: "users",
+                    refColumn: "id"
+                ))
+        ]);
+
+        var ops = SchemaDiffer.Diff(expected, actual);
+
+        // Should not produce a DropConstraint operation since constraint name is empty
+        Assert.DoesNotContain(ops, op => op.Type == MigrationOperationType.DropConstraint);
+    }
+
+    [Fact]
+    public void Diff_MultipleTablesAndColumnsDropped_ProducesMultipleDropOperations()
+    {
+        var expected = new SchemaSnapshot([
+            Table("public", "users", Column("id"), Column("name"))
+        ]);
+
+        var actual = new SchemaSnapshot([
+            Table("public", "users", Column("id"), Column("name"), Column("email")),
+            Table("public", "legacy_table", Column("id")),
+            Table("public", "temp_table", Column("id"))
+        ]);
+
+        var ops = SchemaDiffer.Diff(expected, actual);
+
+        Assert.Contains(ops, op => op.Type == MigrationOperationType.DropTable && op.Table == "legacy_table");
+        Assert.Contains(ops, op => op.Type == MigrationOperationType.DropTable && op.Table == "temp_table");
+        Assert.Contains(ops, op => op.Type == MigrationOperationType.DropColumn && op.Column == "email");
+    }
+
     private static TableSnapshot Table(string schema, string table, params ColumnSnapshot[] cols)
         => new(schema, table, cols);
 

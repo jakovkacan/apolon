@@ -31,34 +31,6 @@ public class SchemaSnapshotTests
         Assert.True(snapshotA.Equals(snapshotB));
     }
 
-    [Fact]
-    public void Diff_ReportsMissingTablesColumnsAndPropertyChanges()
-    {
-        var left = new SchemaSnapshot([
-            new TableSnapshot("public", "users", [
-                Col("id"),
-                Col("status", columnDefault: "'active'")
-            ])
-        ]);
-
-        var right = new SchemaSnapshot([
-            new TableSnapshot("public", "users", [
-                Col("id"),
-                Col("status", columnDefault: null),
-                Col("email")
-            ]),
-            new TableSnapshot("public", "roles", [
-                Col("id")
-            ])
-        ]);
-
-        var diffs = left.Diff(right);
-
-        Assert.Contains("Table missing in THIS: public.roles", diffs);
-        Assert.Contains("public.users: column missing in THIS: email", diffs);
-        Assert.Contains("public.users.status: ColumnDefault differs (this='active', other=<null>)", diffs);
-    }
-
     private static ColumnSnapshot Col(string name, string? columnDefault = null)
         => new(
             ColumnName: name,

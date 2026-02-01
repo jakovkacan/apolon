@@ -32,7 +32,7 @@ internal static class MigrationBuilderSql
             }
             else
             {
-                if (!column.IsNullable) line += " NOT NULL";
+                // DEFAULT must come before NOT NULL in PostgreSQL
                 if (column.DefaultValue != null)
                 {
                     var formatted = column.DefaultIsRawSql
@@ -41,6 +41,7 @@ internal static class MigrationBuilderSql
                     line += $" DEFAULT {formatted}";
                 }
 
+                if (!column.IsNullable) line += " NOT NULL";
                 if (column.IsUnique) line += " UNIQUE";
             }
 
@@ -102,7 +103,8 @@ internal static class MigrationBuilderSql
         bool isIdentity = false,
         string? identityGeneration = null)
     {
-        var nullSql = isNullable ? "" : " NOT NULL";
+        // PRIMARY KEY and IDENTITY columns are implicitly NOT NULL, so we don't add it explicitly
+        var nullSql = (isNullable || isPrimaryKey || isIdentity) ? "" : " NOT NULL";
         var defaultClause = string.IsNullOrWhiteSpace(defaultSql) ? "" : $" DEFAULT {defaultSql}";
         var pkClause = isPrimaryKey ? " PRIMARY KEY" : "";
         var identityClause = isIdentity ? $" GENERATED {NormalizeIdentity(identityGeneration)} AS IDENTITY" : "";

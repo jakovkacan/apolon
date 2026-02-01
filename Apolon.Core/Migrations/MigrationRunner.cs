@@ -258,15 +258,4 @@ public class MigrationRunner
 
         await _executor.DeleteAsync(result[0]);
     }
-
-    private async Task<string?> GetLastAppliedMigration()
-    {
-        var qb = new QueryBuilder<MigrationHistoryTable>()
-            .OrderByDescending(m => m.AppliedAt)
-            .Take(1);
-
-        var result = await _executor.QueryAsync(qb);
-
-        return result.FirstOrDefault()?.MigrationName;
-    }
 }

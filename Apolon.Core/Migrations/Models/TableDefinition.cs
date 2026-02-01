@@ -2,8 +2,9 @@ namespace Apolon.Core.Migrations.Models;
 
 /// <summary>
 /// Represents the complete definition of a database table including columns and constraints.
+/// Internal model used by migration fluent API. Use TableSchema for public APIs.
 /// </summary>
-public sealed record TableDefinition
+internal sealed record TableDefinition
 {
     /// <summary>
     /// The schema name (e.g., "public", "dbo").
@@ -48,8 +49,9 @@ public sealed record TableDefinition
 
 /// <summary>
 /// Primary key constraint definition.
+/// Internal model used by migration fluent API. Use PrimaryKeySchema for public APIs.
 /// </summary>
-public sealed record PrimaryKeyConstraint
+internal sealed record PrimaryKeyConstraint
 {
     /// <summary>
     /// The constraint name (e.g., "PK_Customers").
@@ -64,8 +66,9 @@ public sealed record PrimaryKeyConstraint
 
 /// <summary>
 /// Foreign key constraint definition.
+/// Internal model used by migration fluent API. Use ForeignKeySchema for public APIs.
 /// </summary>
-public sealed record ForeignKeyConstraint
+internal sealed record ForeignKeyConstraint
 {
     /// <summary>
     /// The constraint name (e.g., "FK_Orders_Customers").
@@ -105,8 +108,9 @@ public sealed record ForeignKeyConstraint
 
 /// <summary>
 /// Unique constraint definition.
+/// Internal model used by migration fluent API. Use UniqueConstraintSchema for public APIs.
 /// </summary>
-public sealed record UniqueConstraint
+internal sealed record UniqueConstraint
 {
     /// <summary>
     /// The constraint name (e.g., "UQ_Customers_Email").
@@ -121,8 +125,9 @@ public sealed record UniqueConstraint
 
 /// <summary>
 /// Check constraint definition.
+/// Internal model used by migration fluent API. Use CheckConstraintSchema for public APIs.
 /// </summary>
-public sealed record CheckConstraint
+internal sealed record CheckConstraint
 {
     /// <summary>
     /// The constraint name (e.g., "CK_Products_Price").

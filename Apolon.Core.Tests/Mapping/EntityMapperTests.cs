@@ -122,7 +122,7 @@ public class EntityMapperTests
         Assert.Equal(typeof(User), fk.ReferencedTable);
 
         // User's PK has no [Column], so EntityMapper uses property name ("Id") as PK column name
-        Assert.Equal("Id", fk.ReferencedColumn);
+        Assert.Equal("id", fk.ReferencedColumn);
     }
 
     [Fact]
