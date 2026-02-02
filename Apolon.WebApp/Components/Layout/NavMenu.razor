@@ -1,0 +1,47 @@
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">Apolon.WebApp</a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler"/>
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="patients">
+                <span class="bi bi-person-lines-fill-nav-menu" aria-hidden="true"></span> Patients
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="checkups">
+                <span class="bi bi-clipboard2-pulse-fill-nav-menu" aria-hidden="true"></span> Checkups
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="checkup-types">
+                <span class="bi bi-tags-fill-nav-menu" aria-hidden="true"></span> Checkup Types
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="medications">
+                <span class="bi bi-capsule-pill-nav-menu" aria-hidden="true"></span> Medications
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="prescriptions">
+                <span class="bi bi-file-medical-fill-nav-menu" aria-hidden="true"></span> Prescriptions
+            </NavLink>
+        </div>
+    </nav>
+</div>

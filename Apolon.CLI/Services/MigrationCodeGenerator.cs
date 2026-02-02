@@ -183,11 +183,11 @@ internal static class MigrationCodeGenerator
         // Fluent methods
         var fluentMethods = new List<string>();
 
-        // Annotations (for identity)
+        // Identity
         if (colOp.IsIdentity == true)
         {
             var identityValue = colOp.IdentityGeneration ?? "ALWAYS";
-            fluentMethods.Add($".Annotation(\"Postgres:Identity\", \"{identityValue}\")");
+            fluentMethods.Add($".IsIdentity(\"{identityValue}\")");
         }
 
         // Default value

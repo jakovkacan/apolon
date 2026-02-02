@@ -1,0 +1,198 @@
+@page "/patients"
+@using Apolon.Models
+@rendermode InteractiveServer
+@inject ApolonDbContext Db
+
+<PageTitle>Patients</PageTitle>
+
+<h1>Patients</h1>
+<p class="text-muted">Create, edit, and remove patient records.</p>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert alert-success">@statusMessage</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <h2 class="h5">Existing Patients</h2>
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                <tr>
+                    <th>Id</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>DOB</th>
+                    <th>Gender</th>
+                    <th>Address</th>
+                    <th>Updated</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @if (patients.Count == 0)
+                {
+                    <tr>
+                        <td colspan="9" class="text-muted">No patients found.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var patient in patients)
+                    {
+                        <tr>
+                            <td>@patient.Id</td>
+                            <td>@($"{patient.FirstName} {patient.LastName}")</td>
+                            <td>@patient.Email</td>
+                            <td>@patient.PhoneNumber</td>
+                            <td>@patient.DateOfBirth?.ToString("yyyy-MM-dd")</td>
+                            <td>@patient.Gender</td>
+                            <td>@patient.Address</td>
+                            <td>@patient.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-primary me-2" @onclick="() => StartEdit(patient)">Edit</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(patient)">Delete</button>
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <h2 class="h5">@((isEditing ? "Edit Patient" : "New Patient"))</h2>
+        <EditForm Model="editModel" OnValidSubmit="SaveAsync">
+            <div class="mb-3">
+                <label class="form-label">First Name</label>
+                <InputText class="form-control" @bind-Value="editModel.FirstName"/>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Last Name</label>
+                <InputText class="form-control" @bind-Value="editModel.LastName"/>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Email</label>
+                <InputText class="form-control" type="email" @bind-Value="editModel.Email"/>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Phone</label>
+                <InputText class="form-control" @bind-Value="editModel.PhoneNumber"/>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Date of Birth</label>
+                <InputDate class="form-control" @bind-Value="editModel.DateOfBirth"/>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Gender</label>
+                <InputText class="form-control" @bind-Value="editModel.Gender"/>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Address</label>
+                <InputTextArea class="form-control" @bind-Value="editModel.Address" rows="2"/>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit">@((isEditing ? "Save Changes" : "Create Patient"))</button>
+                <button class="btn btn-outline-secondary" type="button" @onclick="StartCreate">Clear</button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private readonly List<Patient> patients = new();
+    private Patient editModel = CreateNewPatient();
+    private bool isEditing;
+    private string? statusMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        errorMessage = null;
+        try
+        {
+            patients.Clear();
+            patients.AddRange(await Db.Patients.ToListAsync());
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void StartCreate()
+    {
+        isEditing = false;
+        editModel = CreateNewPatient();
+    }
+
+    private void StartEdit(Patient patient)
+    {
+        isEditing = true;
+        editModel = new Patient
+        {
+            Id = patient.Id,
+            FirstName = patient.FirstName,
+            LastName = patient.LastName,
+            Email = patient.Email,
+            PhoneNumber = patient.PhoneNumber,
+            DateOfBirth = patient.DateOfBirth,
+            Gender = patient.Gender,
+            Address = patient.Address,
+            CreatedAt = patient.CreatedAt,
+            UpdatedAt = patient.UpdatedAt
+        };
+    }
+
+    private async Task SaveAsync()
+    {
+        errorMessage = null;
+        statusMessage = null;
+
+        editModel.UpdatedAt = DateTime.UtcNow;
+
+        if (isEditing)
+            Db.Patients.Update(editModel);
+        else
+            Db.Patients.Add(editModel);
+
+        Db.SaveChanges();
+        statusMessage = isEditing ? "Patient updated." : "Patient created.";
+        StartCreate();
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(Patient patient)
+    {
+        errorMessage = null;
+        statusMessage = null;
+
+        Db.Patients.Remove(patient);
+        Db.SaveChanges();
+        statusMessage = "Patient deleted.";
+        await LoadAsync();
+    }
+
+    private static Patient CreateNewPatient()
+    {
+        return new Patient
+        {
+            FirstName = string.Empty,
+            LastName = string.Empty,
+            Email = string.Empty,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
+}

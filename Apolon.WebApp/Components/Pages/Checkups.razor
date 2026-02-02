@@ -1,0 +1,212 @@
+@page "/checkups"
+@using Apolon.Models
+@rendermode InteractiveServer
+@inject ApolonDbContext Db
+
+<PageTitle>Checkups</PageTitle>
+
+<h1>Checkups</h1>
+<p class="text-muted">Record patient visits and link them to checkup types.</p>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert alert-success">@statusMessage</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <h2 class="h5">Recorded Checkups</h2>
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                <tr>
+                    <th>Id</th>
+                    <th>Patient</th>
+                    <th>Type</th>
+                    <th>Date</th>
+                    <th>Notes</th>
+                    <th>Results</th>
+                    <th>Updated</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @if (checkups.Count == 0)
+                {
+                    <tr>
+                        <td colspan="8" class="text-muted">No checkups found.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var checkup in checkups)
+                    {
+                        <tr>
+                            <td>@checkup.Id</td>
+                            <td>@(checkup.Patient is null ? $"Patient #{checkup.PatientId}" : $"{checkup.Patient.FirstName} {checkup.Patient.LastName}")</td>
+                            <td>@(checkup.CheckupType?.TypeCode ?? $"Type #{checkup.CheckupTypeId}")</td>
+                            <td>@checkup.CheckupDate.ToString("yyyy-MM-dd")</td>
+                            <td>@checkup.Notes</td>
+                            <td>@checkup.Results</td>
+                            <td>@checkup.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-primary me-2" @onclick="() => StartEdit(checkup)">Edit</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(checkup)">Delete</button>
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <h2 class="h5">@((isEditing ? "Edit Checkup" : "New Checkup"))</h2>
+        @if (patients.Count == 0 || checkupTypes.Count == 0)
+        {
+            <div class="alert alert-warning">
+                Add at least one patient and one checkup type before creating checkups.
+            </div>
+        }
+        <EditForm Model="editModel" OnValidSubmit="SaveAsync">
+            <div class="mb-3">
+                <label class="form-label">Patient</label>
+                <InputSelect class="form-select" @bind-Value="editModel.PatientId" disabled="@(patients.Count == 0)">
+                    <option value="0">Select patient</option>
+                    @foreach (var patient in patients)
+                    {
+                        <option value="@patient.Id">@($"{patient.FirstName} {patient.LastName}")</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Checkup Type</label>
+                <InputSelect class="form-select" @bind-Value="editModel.CheckupTypeId" disabled="@(checkupTypes.Count == 0)">
+                    <option value="0">Select type</option>
+                    @foreach (var type in checkupTypes)
+                    {
+                        <option value="@type.Id">@type.TypeCode</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Checkup Date</label>
+                <InputDate class="form-control" @bind-Value="editModel.CheckupDate"/>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Notes</label>
+                <InputTextArea class="form-control" @bind-Value="editModel.Notes" rows="2"/>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Results</label>
+                <InputTextArea class="form-control" @bind-Value="editModel.Results" rows="2"/>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit" disabled="@(patients.Count == 0 || checkupTypes.Count == 0)">
+                    @((isEditing ? "Save Changes" : "Create Checkup"))
+                </button>
+                <button class="btn btn-outline-secondary" type="button" @onclick="StartCreate">Clear</button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private readonly List<Checkup> checkups = new();
+    private readonly List<Patient> patients = new();
+    private readonly List<CheckupType> checkupTypes = new();
+    private Checkup editModel = CreateNewCheckup();
+    private bool isEditing;
+    private string? statusMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        errorMessage = null;
+        try
+        {
+            patients.Clear();
+            patients.AddRange(await Db.Patients.ToListAsync());
+
+            checkupTypes.Clear();
+            checkupTypes.AddRange(await Db.CheckupTypes.ToListAsync());
+
+            checkups.Clear();
+            checkups.AddRange(Db.Checkups.Include(c => c.Patient!, c => c.CheckupType!));
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void StartCreate()
+    {
+        isEditing = false;
+        editModel = CreateNewCheckup();
+    }
+
+    private void StartEdit(Checkup checkup)
+    {
+        isEditing = true;
+        editModel = new Checkup
+        {
+            Id = checkup.Id,
+            PatientId = checkup.PatientId,
+            CheckupTypeId = checkup.CheckupTypeId,
+            CheckupDate = checkup.CheckupDate,
+            Notes = checkup.Notes,
+            Results = checkup.Results,
+            CreatedAt = checkup.CreatedAt,
+            UpdatedAt = checkup.UpdatedAt
+        };
+    }
+
+    private async Task SaveAsync()
+    {
+        errorMessage = null;
+        statusMessage = null;
+
+        editModel.UpdatedAt = DateTime.UtcNow;
+
+        if (isEditing)
+            Db.Checkups.Update(editModel);
+        else
+            Db.Checkups.Add(editModel);
+
+        Db.SaveChanges();
+        statusMessage = isEditing ? "Checkup updated." : "Checkup created.";
+        StartCreate();
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(Checkup checkup)
+    {
+        errorMessage = null;
+        statusMessage = null;
+
+        Db.Checkups.Remove(checkup);
+        Db.SaveChanges();
+        statusMessage = "Checkup deleted.";
+        await LoadAsync();
+    }
+
+    private static Checkup CreateNewCheckup()
+    {
+        return new Checkup
+        {
+            CheckupDate = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
+}

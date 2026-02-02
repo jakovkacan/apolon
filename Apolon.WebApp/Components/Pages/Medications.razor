@@ -1,0 +1,172 @@
+@page "/medications"
+@using Apolon.Models
+@rendermode InteractiveServer
+@inject ApolonDbContext Db
+
+<PageTitle>Medications</PageTitle>
+
+<h1>Medications</h1>
+<p class="text-muted">Maintain the medication catalog used for prescriptions.</p>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert alert-success">@statusMessage</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <h2 class="h5">Existing Medications</h2>
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                <tr>
+                    <th>Id</th>
+                    <th>Name</th>
+                    <th>Generic</th>
+                    <th>Dosage Form</th>
+                    <th>Updated</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @if (medications.Count == 0)
+                {
+                    <tr>
+                        <td colspan="6" class="text-muted">No medications found.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var medication in medications)
+                    {
+                        <tr>
+                            <td>@medication.Id</td>
+                            <td>@medication.Name</td>
+                            <td>@medication.GenericName</td>
+                            <td>@medication.DosageForm</td>
+                            <td>@medication.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-primary me-2" @onclick="() => StartEdit(medication)">Edit</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(medication)">Delete</button>
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <h2 class="h5">@((isEditing ? "Edit Medication" : "New Medication"))</h2>
+        <EditForm Model="editModel" OnValidSubmit="SaveAsync">
+            <div class="mb-3">
+                <label class="form-label">Name</label>
+                <InputText class="form-control" @bind-Value="editModel.Name"/>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Generic Name</label>
+                <InputText class="form-control" @bind-Value="editModel.GenericName"/>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Dosage Form</label>
+                <InputText class="form-control" @bind-Value="editModel.DosageForm"/>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit">@((isEditing ? "Save Changes" : "Create Medication"))</button>
+                <button class="btn btn-outline-secondary" type="button" @onclick="StartCreate">Clear</button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private readonly List<Medication> medications = new();
+    private Medication editModel = CreateNewMedication();
+    private bool isEditing;
+    private string? statusMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        errorMessage = null;
+        try
+        {
+            medications.Clear();
+            medications.AddRange(await Db.Medications.ToListAsync());
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void StartCreate()
+    {
+        isEditing = false;
+        editModel = CreateNewMedication();
+    }
+
+    private void StartEdit(Medication medication)
+    {
+        isEditing = true;
+        editModel = new Medication
+        {
+            Id = medication.Id,
+            Name = medication.Name,
+            GenericName = medication.GenericName,
+            DosageForm = medication.DosageForm,
+            CreatedAt = medication.CreatedAt,
+            UpdatedAt = medication.UpdatedAt
+        };
+    }
+
+    private async Task SaveAsync()
+    {
+        errorMessage = null;
+        statusMessage = null;
+
+        editModel.UpdatedAt = DateTime.UtcNow;
+
+        if (isEditing)
+            Db.Medications.Update(editModel);
+        else
+            Db.Medications.Add(editModel);
+
+        Db.SaveChanges();
+        statusMessage = isEditing ? "Medication updated." : "Medication created.";
+        StartCreate();
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(Medication medication)
+    {
+        errorMessage = null;
+        statusMessage = null;
+
+        Db.Medications.Remove(medication);
+        Db.SaveChanges();
+        statusMessage = "Medication deleted.";
+        await LoadAsync();
+    }
+
+    private static Medication CreateNewMedication()
+    {
+        return new Medication
+        {
+            Name = string.Empty,
+            GenericName = string.Empty,
+            DosageForm = string.Empty,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
+}

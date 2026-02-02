@@ -1,0 +1,243 @@
+@page "/prescriptions"
+@using Apolon.Models
+@rendermode InteractiveServer
+@inject ApolonDbContext Db
+
+<PageTitle>Prescriptions</PageTitle>
+
+<h1>Prescriptions</h1>
+<p class="text-muted">Assign medications to checkups with dosing details.</p>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert alert-success">@statusMessage</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <h2 class="h5">Existing Prescriptions</h2>
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                <tr>
+                    <th>Id</th>
+                    <th>Checkup</th>
+                    <th>Medication</th>
+                    <th>Dosage</th>
+                    <th>Frequency</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Updated</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @if (prescriptions.Count == 0)
+                {
+                    <tr>
+                        <td colspan="9" class="text-muted">No prescriptions found.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var prescription in prescriptions)
+                    {
+                        <tr>
+                            <td>@prescription.Id</td>
+                            <td>@GetCheckupLabel(prescription.CheckupId)</td>
+                            <td>@(prescription.Medication?.Name ?? $"Medication #{prescription.MedicationId}")</td>
+                            <td>@($"{prescription.Dosage} {prescription.DosageUnit}")</td>
+                            <td>@prescription.Frequency</td>
+                            <td>@prescription.StartDate.ToString("yyyy-MM-dd")</td>
+                            <td>@prescription.EndDate?.ToString("yyyy-MM-dd")</td>
+                            <td>@prescription.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-primary me-2" @onclick="() => StartEdit(prescription)">Edit</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(prescription)">Delete</button>
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <h2 class="h5">@((isEditing ? "Edit Prescription" : "New Prescription"))</h2>
+        @if (checkups.Count == 0 || medications.Count == 0)
+        {
+            <div class="alert alert-warning">
+                Add at least one checkup and one medication before creating prescriptions.
+            </div>
+        }
+        <EditForm Model="editModel" OnValidSubmit="SaveAsync">
+            <div class="mb-3">
+                <label class="form-label">Checkup</label>
+                <InputSelect class="form-select" @bind-Value="editModel.CheckupId" disabled="@(checkups.Count == 0)">
+                    <option value="0">Select checkup</option>
+                    @foreach (var checkup in checkups)
+                    {
+                        <option value="@checkup.Id">@GetCheckupLabel(checkup.Id)</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Medication</label>
+                <InputSelect class="form-select" @bind-Value="editModel.MedicationId" disabled="@(medications.Count == 0)">
+                    <option value="0">Select medication</option>
+                    @foreach (var medication in medications)
+                    {
+                        <option value="@medication.Id">@medication.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Dosage</label>
+                    <InputNumber class="form-control" @bind-Value="editModel.Dosage"/>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Dosage Unit</label>
+                    <InputText class="form-control" @bind-Value="editModel.DosageUnit"/>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Frequency</label>
+                <InputText class="form-control" @bind-Value="editModel.Frequency"/>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Start Date</label>
+                    <InputDate class="form-control" @bind-Value="editModel.StartDate"/>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">End Date</label>
+                    <InputDate class="form-control" @bind-Value="editModel.EndDate"/>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit" disabled="@(checkups.Count == 0 || medications.Count == 0)">
+                    @((isEditing ? "Save Changes" : "Create Prescription"))
+                </button>
+                <button class="btn btn-outline-secondary" type="button" @onclick="StartCreate">Clear</button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private readonly List<Prescription> prescriptions = new();
+    private readonly List<Checkup> checkups = new();
+    private readonly List<Medication> medications = new();
+    private Prescription editModel = CreateNewPrescription();
+    private bool isEditing;
+    private string? statusMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        errorMessage = null;
+        try
+        {
+            checkups.Clear();
+            checkups.AddRange(Db.Checkups.Include(c => c.Patient!));
+
+            medications.Clear();
+            medications.AddRange(await Db.Medications.ToListAsync());
+
+            prescriptions.Clear();
+            prescriptions.AddRange(Db.Prescriptions.Include(p => p.Medication!, p => p.Checkup!));
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void StartCreate()
+    {
+        isEditing = false;
+        editModel = CreateNewPrescription();
+    }
+
+    private void StartEdit(Prescription prescription)
+    {
+        isEditing = true;
+        editModel = new Prescription
+        {
+            Id = prescription.Id,
+            CheckupId = prescription.CheckupId,
+            MedicationId = prescription.MedicationId,
+            Dosage = prescription.Dosage,
+            DosageUnit = prescription.DosageUnit,
+            Frequency = prescription.Frequency,
+            StartDate = prescription.StartDate,
+            EndDate = prescription.EndDate,
+            CreatedAt = prescription.CreatedAt,
+            UpdatedAt = prescription.UpdatedAt
+        };
+    }
+
+    private async Task SaveAsync()
+    {
+        errorMessage = null;
+        statusMessage = null;
+
+        editModel.UpdatedAt = DateTime.UtcNow;
+
+        if (isEditing)
+            Db.Prescriptions.Update(editModel);
+        else
+            Db.Prescriptions.Add(editModel);
+
+        Db.SaveChanges();
+        statusMessage = isEditing ? "Prescription updated." : "Prescription created.";
+        StartCreate();
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(Prescription prescription)
+    {
+        errorMessage = null;
+        statusMessage = null;
+
+        Db.Prescriptions.Remove(prescription);
+        Db.SaveChanges();
+        statusMessage = "Prescription deleted.";
+        await LoadAsync();
+    }
+
+    private string GetCheckupLabel(int checkupId)
+    {
+        var checkup = checkups.FirstOrDefault(c => c.Id == checkupId);
+        if (checkup == null)
+            return $"Checkup #{checkupId}";
+
+        var patientName = checkup.Patient == null ? "Unknown patient" : $"{checkup.Patient.FirstName} {checkup.Patient.LastName}";
+        return $"#{checkup.Id} - {patientName}";
+    }
+
+    private static Prescription CreateNewPrescription()
+    {
+        return new Prescription
+        {
+            CheckupId = 0,
+            MedicationId = 0,
+            Dosage = 1,
+            DosageUnit = string.Empty,
+            Frequency = string.Empty,
+            StartDate = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
+}

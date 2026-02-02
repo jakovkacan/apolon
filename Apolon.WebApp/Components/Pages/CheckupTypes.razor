@@ -1,0 +1,155 @@
+@page "/checkup-types"
+@using Apolon.Models
+@rendermode InteractiveServer
+@inject ApolonDbContext Db
+
+<PageTitle>Checkup Types</PageTitle>
+
+<h1>Checkup Types</h1>
+<p class="text-muted">Manage the lookup values used for checkups.</p>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert alert-success">@statusMessage</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <h2 class="h5">Existing Types</h2>
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                <tr>
+                    <th>Id</th>
+                    <th>Type Code</th>
+                    <th>Description</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @if (checkupTypes.Count == 0)
+                {
+                    <tr>
+                        <td colspan="4" class="text-muted">No checkup types found.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var checkupType in checkupTypes)
+                    {
+                        <tr>
+                            <td>@checkupType.Id</td>
+                            <td>@checkupType.TypeCode</td>
+                            <td>@checkupType.Description</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-primary me-2" @onclick="() => StartEdit(checkupType)">Edit</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(checkupType)">Delete</button>
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <h2 class="h5">@((isEditing ? "Edit Checkup Type" : "New Checkup Type"))</h2>
+        <EditForm Model="editModel" OnValidSubmit="SaveAsync">
+            <div class="mb-3">
+                <label class="form-label">Type Code</label>
+                <InputText class="form-control" @bind-Value="editModel.TypeCode"/>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <InputTextArea class="form-control" @bind-Value="editModel.Description" rows="2"/>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit">@((isEditing ? "Save Changes" : "Create Type"))</button>
+                <button class="btn btn-outline-secondary" type="button" @onclick="StartCreate">Clear</button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private readonly List<CheckupType> checkupTypes = new();
+    private CheckupType editModel = CreateNewType();
+    private bool isEditing;
+    private string? statusMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        errorMessage = null;
+        try
+        {
+            checkupTypes.Clear();
+            checkupTypes.AddRange(await Db.CheckupTypes.ToListAsync());
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void StartCreate()
+    {
+        isEditing = false;
+        editModel = CreateNewType();
+    }
+
+    private void StartEdit(CheckupType checkupType)
+    {
+        isEditing = true;
+        editModel = new CheckupType
+        {
+            Id = checkupType.Id,
+            TypeCode = checkupType.TypeCode,
+            Description = checkupType.Description
+        };
+    }
+
+    private async Task SaveAsync()
+    {
+        errorMessage = null;
+        statusMessage = null;
+
+        if (isEditing)
+            Db.CheckupTypes.Update(editModel);
+        else
+            Db.CheckupTypes.Add(editModel);
+
+        Db.SaveChanges();
+        statusMessage = isEditing ? "Checkup type updated." : "Checkup type created.";
+        StartCreate();
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(CheckupType checkupType)
+    {
+        errorMessage = null;
+        statusMessage = null;
+
+        Db.CheckupTypes.Remove(checkupType);
+        Db.SaveChanges();
+        statusMessage = "Checkup type deleted.";
+        await LoadAsync();
+    }
+
+    private static CheckupType CreateNewType()
+    {
+        return new CheckupType
+        {
+            TypeCode = string.Empty
+        };
+    }
+}
