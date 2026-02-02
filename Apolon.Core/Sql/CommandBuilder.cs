@@ -14,7 +14,7 @@ public class CommandBuilder<T> where T : class
         var paramNames = string.Join(", ", columns.Select((_, i) => $"@p{i}"));
         var values = columns.Select(c => c.Property.GetValue(entity)).ToList();
 
-        var sql = $"INSERT INTO {_metadata.Schema}.{_metadata.TableName} ({columnNames}) VALUES ({paramNames})";
+        var sql = $"INSERT INTO {_metadata.Schema}.{_metadata.TableName} ({columnNames}) VALUES ({paramNames}) RETURNING {_metadata.PrimaryKey.ColumnName}";
         return (sql, values);
     }
 

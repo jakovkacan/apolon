@@ -7,16 +7,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.10"/>
+      <ProjectReference Include="..\Apolon.Core\Apolon.Core.csproj" />
+      <ProjectReference Include="..\Apolon.Models\Apolon.Models.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Apolon.Models\Apolon.Models.csproj"/>
-    </ItemGroup>
-
-    <ItemGroup>
-        <Folder Include="Context\"/>
-        <Folder Include="Migrations\"/>
+      <Folder Include="Migrations\" />
     </ItemGroup>
 
 </Project>

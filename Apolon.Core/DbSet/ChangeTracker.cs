@@ -1,4 +1,5 @@
-﻿using Apolon.Core.Exceptions;
+﻿using Apolon.Core.DbSet.Enums;
+using Apolon.Core.Exceptions;
 
 namespace Apolon.Core.DbSet;
 
@@ -232,7 +233,7 @@ public class ChangeTracker
     ///     Captures current property values as original values.
     ///     Used for change detection.
     /// </summary>
-    private void CaptureOriginalValues(object entity)
+    private void CaptureOriginalValues(object? entity)
     {
         if (entity == null)
             return;
@@ -250,7 +251,7 @@ public class ChangeTracker
 
             try
             {
-                values[prop.Name] = prop.GetValue(entity);
+                values[prop.Name] = prop.GetValue(entity)!;
             }
             catch
             {
@@ -260,38 +261,4 @@ public class ChangeTracker
 
         _originalValues[entity] = values;
     }
-}
-
-/// <summary>
-///     Enum representing the state of an entity in the change tracker.
-/// </summary>
-public enum EntityState
-{
-    /// <summary>
-    ///     Entity is not being tracked.
-    /// </summary>
-    Detached = 0,
-
-    /// <summary>
-    ///     Entity is being tracked and exists in the database.
-    ///     No changes have been made to property values.
-    /// </summary>
-    Unchanged = 1,
-
-    /// <summary>
-    ///     Entity is being tracked and will be deleted from the database.
-    /// </summary>
-    Deleted = 2,
-
-    /// <summary>
-    ///     Entity is being tracked and has been modified.
-    ///     Will be updated in the database.
-    /// </summary>
-    Modified = 3,
-
-    /// <summary>
-    ///     Entity is being tracked but does not exist in the database.
-    ///     Will be inserted when SaveChanges is called.
-    /// </summary>
-    Added = 4
 }

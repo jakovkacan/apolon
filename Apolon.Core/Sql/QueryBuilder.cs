@@ -124,8 +124,8 @@ public class QueryBuilder<T> where T : class
     {
         if (expr.Method.Name == "Contains" && expr.Object is MemberExpression memberExpr)
         {
-            var columnName = GetColumnName(memberExpr.Member.Name);
-            var argument = ((ConstantExpression)expr.Arguments[0]).Value;
+            var columnName = GetColumnName(memberExpr.Member.Name); 
+            var argument = ((ConstantExpression)expr.Arguments[0]).Value!;
             var paramName = AddParameter(argument);
             return $"{columnName} LIKE {paramName}";
         }

@@ -1,6 +1,10 @@
 using System.Diagnostics;
 using System.Reflection;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Apolon.Core.Attributes;
+using Apolon.Core.Migrations;
 using Apolon.Core.Migrations.Models;
 
 namespace Apolon.CLI.Services;
@@ -22,7 +26,6 @@ internal static class TypeDiscovery
         else
             throw new InvalidOperationException($"Path not found or invalid: {path}");
 
-        // If we found a project file, always rebuild it
         if (projectPath != null)
         {
             if (!rebuildProject) return LoadTypes(projectPath, hasTableAttribute);
@@ -128,6 +131,7 @@ internal static class TypeDiscovery
         var types = assembly.GetTypes()
             .Where(t => !hasTableAttribute || t.GetCustomAttribute<TableAttribute>() != null)
             .Where(t => t is { IsClass: true, IsAbstract: false })
+            .Where(t => t.Name != "MigrationHistoryTable")
             .ToArray();
 
         return types.Length == 0
@@ -169,65 +173,125 @@ internal static class TypeDiscovery
     {
         var fullPath = Path.GetFullPath(migrationsPath);
 
-        // Check if directory exists
         if (!Directory.Exists(fullPath))
         {
             Console.WriteLine($"Migrations directory not found: {fullPath}");
             return [];
         }
 
-        // Check for .cs files (auto-build if needed)
         var csFiles = Directory.GetFiles(fullPath, "*.cs", SearchOption.TopDirectoryOnly)
             .Where(f => !f.EndsWith(".Designer.cs") && !f.EndsWith(".g.cs"))
             .ToArray();
 
-        if (csFiles.Length > 0)
+        if (csFiles.Length == 0)
         {
-            // Build the project to get types
-            var types = await DiscoverEntityTypes(fullPath, rebuildProject: rebuildProject);
-
-            // Create a mapping of class names to their source files
-            var fileNameToTimestamp = csFiles
-                .Select(f => new
-                {
-                    FileName = Path.GetFileNameWithoutExtension(f),
-                    FilePath = f
-                })
-                .Where(x => x.FileName.Length > 15 && x.FileName[14] == '_') // YYYYMMDDHHMMSS_
-                .ToDictionary(
-                    x => x.FileName[15..], // Class name after timestamp
-                    x => x.FileName[..14]); // Timestamp
-
-            // Filter for Migration types and extract timestamp/name from filename
-            return types
-                .Where(t => typeof(Migration).IsAssignableFrom(t))
-                .Select(t => ParseMigrationNameFromType(t, fileNameToTimestamp))
-                .Where(m => m.Type != null)
-                .OrderBy(m => m.Timestamp)
-                .ToArray();
+            Console.WriteLine("No migration files found.");
+            return [];
         }
 
-        // Try to load from compiled assemblies in the directory
-        var dllFiles = Directory.GetFiles(fullPath, "*.dll", SearchOption.AllDirectories);
-        var migrationTypes = new List<(Type Type, string Timestamp, string Name)>();
+        Console.WriteLine($"Found {csFiles.Length} migration file(s)");
 
-        foreach (var dllFile in dllFiles)
-            try
-            {
-                var assembly = Assembly.LoadFrom(dllFile);
-                var types = assembly.GetTypes()
-                    .Where(t => typeof(Migration).IsAssignableFrom(t) && !t.IsAbstract)
-                    .Select(ParseMigrationNameFromClassName)
-                    .Where(m => m.Type != null);
+        // Compile migration files in-memory using Roslyn
+        var assembly = CompileMigrationsAsync(csFiles);
 
-                migrationTypes.AddRange(types);
-            }
-            catch
-            {
-                // Ignore assemblies that can't be loaded
-            }
+        // Extract migrations from compiled assembly
+        var migrations = assembly.GetTypes()
+            .Where(t => typeof(Migration).IsAssignableFrom(t) && !t.IsAbstract)
+            .Select(t => ParseMigrationFromFile(t, csFiles))
+            .Where(m => m.Type != null)
+            .OrderBy(m => m.Timestamp)
+            .ToArray();
 
-        return migrationTypes.OrderBy(m => m.Timestamp).ToArray();
+        Console.WriteLine($"Loaded {migrations.Length} migration type(s)");
+        return migrations;
+    }
+
+    private static (Type Type, string Timestamp, string Name) ParseMigrationFromFile(Type type, string[] csFiles)
+    {
+        var className = type.Name;
+
+        // Find matching file: YYYYMMDDHHMMSS_ClassName.cs
+        var matchingFile = csFiles.FirstOrDefault(f =>
+        {
+            var fileName = Path.GetFileNameWithoutExtension(f);
+            return fileName.Length > 15 &&
+                   fileName[14] == '_' &&
+                   fileName[15..] == className;
+        });
+
+        if (matchingFile != null)
+        {
+            var fileName = Path.GetFileNameWithoutExtension(matchingFile);
+            var timestamp = fileName[..14];
+            return (type, timestamp, className);
+        }
+
+        return (type, "00000000000000", className);
+    }
+
+    private static Assembly CompileMigrationsAsync(string[] migrationFiles)
+    {
+        var systemAssemblyLocation = typeof(object).Assembly.Location;
+        var systemDir = Path.GetDirectoryName(systemAssemblyLocation)!;
+
+        var references = new List<MetadataReference>
+        {
+            CreateReference("System.Private.CoreLib.dll"),
+            CreateReference("System.Runtime.dll"),
+            CreateReference("System.Console.dll"),
+            CreateReference("System.Linq.dll"),
+            CreateReference("System.Linq.Expressions.dll"),
+            CreateReference("System.Collections.dll"),
+            MetadataReference.CreateFromFile(typeof(Migration).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(MigrationBuilder).Assembly.Location),
+        };
+
+        // Add implicit global usings (like .NET 9 does)
+        const string globalUsings = @"
+global using System;
+global using System.Collections.Generic;
+global using System.Linq;
+global using System.Linq.Expressions;
+";
+
+        var syntaxTrees = new List<SyntaxTree>
+        {
+            CSharpSyntaxTree.ParseText(globalUsings, path: "GlobalUsings.g.cs")
+        };
+
+        // Add migration files
+        syntaxTrees.AddRange(migrationFiles.Select(file =>
+            CSharpSyntaxTree.ParseText(File.ReadAllText(file), path: file)));
+
+        var compilation = CSharpCompilation.Create(
+            assemblyName: $"Migrations_{Guid.NewGuid():N}",
+            syntaxTrees: syntaxTrees,
+            references: references,
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        using var ms = new MemoryStream();
+        var result = compilation.Emit(ms);
+
+        if (!result.Success)
+        {
+            var errors = string.Join("\n", result.Diagnostics
+                .Where(d => d.Severity == DiagnosticSeverity.Error)
+                .Select(d =>
+                    $"{d.Location.GetLineSpan().Path}({d.Location.GetLineSpan().StartLinePosition.Line + 1}): {d.GetMessage()}"));
+
+            throw new InvalidOperationException($"Failed to compile migrations:\n{errors}");
+        }
+
+        ms.Seek(0, SeekOrigin.Begin);
+        return Assembly.Load(ms.ToArray());
+
+        MetadataReference CreateReference(string fileName)
+        {
+            var path = Path.Combine(systemDir, fileName);
+            return !File.Exists(path)
+                ? throw new FileNotFoundException($"Required assembly not found: {path}")
+                : MetadataReference.CreateFromFile(path);
+        }
     }
 
     private static (Type Type, string Timestamp, string Name) ParseMigrationNameFromType(

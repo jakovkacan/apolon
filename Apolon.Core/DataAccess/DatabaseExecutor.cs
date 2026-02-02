@@ -16,10 +16,16 @@ internal class DatabaseExecutor(IDbConnection connection)
         for (var i = 0; i < values.Count; i++)
             connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
 
-        return connection.ExecuteNonQuery(command);
+        var generatedId = connection.ExecuteScalar(command);
+    
+        // Set the generated ID back on the entity
+        var metadata = EntityMapper.GetMetadata(typeof(T));
+        metadata.PrimaryKey.Property.SetValue(entity, Convert.ChangeType(generatedId, metadata.PrimaryKey.Property.PropertyType));
+
+        return 1;
     }
 
-    public Task<int> InsertAsync<T>(T entity) where T : class
+    public async Task<int> InsertAsync<T>(T entity) where T : class
     {
         var builder = new CommandBuilder<T>();
         var (sql, values) = builder.BuildInsert(entity);
@@ -27,8 +33,14 @@ internal class DatabaseExecutor(IDbConnection connection)
 
         for (var i = 0; i < values.Count; i++)
             connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
+        
+        var generatedId = await connection.ExecuteScalarAsync(command);
+    
+        // Set the generated ID back on the entity
+        var metadata = EntityMapper.GetMetadata(typeof(T));
+        metadata.PrimaryKey.Property.SetValue(entity, Convert.ChangeType(generatedId, metadata.PrimaryKey.Property.PropertyType));
 
-        return connection.ExecuteNonQueryAsync(command);
+        return 1;
     }
 
     public int Update<T>(T entity) where T : class

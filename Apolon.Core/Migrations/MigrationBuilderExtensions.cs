@@ -62,7 +62,7 @@ public static class MigrationBuilderExtensions
     /// <summary>
     ///     Extracts column definitions from the anonymous type returned by the columns lambda.
     /// </summary>
-    private static List<ColumnDefinition> ExtractColumnDefinitions(object columnsObject)
+    private static List<ColumnDefinition> ExtractColumnDefinitions(object? columnsObject)
     {
         var columnDefinitions = new List<ColumnDefinition>();
 

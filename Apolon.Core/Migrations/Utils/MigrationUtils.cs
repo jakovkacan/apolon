@@ -9,7 +9,7 @@ namespace Apolon.Core.Migrations.Utils;
 
 internal static class MigrationUtils
 {
-    internal static string ConvertOperationToSql(MigrationOperation operation)
+    private static string ConvertOperationToSql(MigrationOperation operation)
     {
         return operation.Type switch
         {
@@ -44,8 +44,6 @@ internal static class MigrationUtils
                 OnDeleteBehaviorExtensions.ParseOrDefault(operation.OnDeleteRule)),
             _ => throw new InvalidOperationException($"Unsupported migration operation type: {operation.Type}")
         };
-
-        ;
     }
 
     internal static List<string> ConvertOperationsToSql(IReadOnlyList<MigrationOperation> operations)
@@ -172,29 +170,31 @@ internal static class MigrationUtils
         var methodName = memberAccess.Name.Identifier.Text;
         var arguments = invocation.ArgumentList.Arguments;
 
+        var schemaName = GetStringArgument(arguments, "schema") ?? GetStringArgument(arguments, 0) ?? "public";
+        var tableName = GetStringArgument(arguments, "table") ?? GetStringArgument(arguments, 1);
+        var columnName = GetStringArgument(arguments, "column") ?? GetStringArgument(arguments, 2);
+
         switch (methodName)
         {
             case "CreateSchema":
-                builder.CreateSchema(GetStringArgument(arguments, "schema") ?? GetStringArgument(arguments, 0));
+                builder.CreateSchema(schemaName);
                 break;
 
             case "CreateTable":
-                // For fluent CreateTable, we need to parse the lambda expressions
                 ParseCreateTable(invocation, builder);
                 break;
 
             case "DropTable":
-                builder.DropTable(
-                    GetStringArgument(arguments, "schema") ?? GetStringArgument(arguments, 0),
-                    GetStringArgument(arguments, "table") ?? GetStringArgument(arguments, 1));
+                builder.DropTable(schemaName, tableName ?? throw new InvalidOperationException("Missing table name"));
                 break;
 
             case "AddColumn":
+                var sqlTypeAddColumn = GetStringArgument(arguments, "sqlType") ?? GetStringArgument(arguments, 3);
                 builder.AddColumn(
-                    GetStringArgument(arguments, "schema") ?? GetStringArgument(arguments, 0),
-                    GetStringArgument(arguments, "table") ?? GetStringArgument(arguments, 1),
-                    GetStringArgument(arguments, "column") ?? GetStringArgument(arguments, 2),
-                    GetStringArgument(arguments, "sqlType") ?? GetStringArgument(arguments, 3),
+                    schemaName,
+                    tableName ?? throw new InvalidOperationException("Missing table name"),
+                    columnName ?? throw new InvalidOperationException("Missing column name"),
+                    sqlTypeAddColumn ?? throw new InvalidOperationException("Missing column SQL type"),
                     GetBoolArgument(arguments, "isNullable") ?? GetBoolArgument(arguments, 4) ?? false,
                     GetStringArgument(arguments, "defaultSql"),
                     GetBoolArgument(arguments, "isPrimaryKey") ?? false,
@@ -204,66 +204,80 @@ internal static class MigrationUtils
 
             case "DropColumn":
                 builder.DropColumn(
-                    GetStringArgument(arguments, "schema") ?? GetStringArgument(arguments, 0),
-                    GetStringArgument(arguments, "table") ?? GetStringArgument(arguments, 1),
-                    GetStringArgument(arguments, "column") ?? GetStringArgument(arguments, 2));
+                    schemaName,
+                    tableName ?? throw new InvalidOperationException("Missing table name"),
+                    columnName ?? throw new InvalidOperationException("Missing column name"));
                 break;
 
             case "AlterColumnType":
+                var sqlTypeAlterColumnType = GetStringArgument(arguments, "sqlType") ?? GetStringArgument(arguments, 3);
                 builder.AlterColumnType(
-                    GetStringArgument(arguments, "schema") ?? GetStringArgument(arguments, 0),
-                    GetStringArgument(arguments, "table") ?? GetStringArgument(arguments, 1),
-                    GetStringArgument(arguments, "column") ?? GetStringArgument(arguments, 2),
-                    GetStringArgument(arguments, "sqlType") ?? GetStringArgument(arguments, 3));
+                    schemaName,
+                    tableName ?? throw new InvalidOperationException("Missing table name"),
+                    columnName ?? throw new InvalidOperationException("Missing column name"),
+                    sqlTypeAlterColumnType ?? throw new InvalidOperationException("Missing column SQL type"));
                 break;
 
             case "AlterNullability":
                 builder.AlterNullability(
-                    GetStringArgument(arguments, "schema") ?? GetStringArgument(arguments, 0),
-                    GetStringArgument(arguments, "table") ?? GetStringArgument(arguments, 1),
-                    GetStringArgument(arguments, "column") ?? GetStringArgument(arguments, 2),
+                    schemaName,
+                    tableName ?? throw new InvalidOperationException("Missing table name"),
+                    columnName ?? throw new InvalidOperationException("Missing column name"),
                     GetBoolArgument(arguments, "isNullable") ?? GetBoolArgument(arguments, 3) ?? false);
                 break;
 
             case "SetDefault":
+                var defaultSqlSetDefault =
+                    GetStringArgument(arguments, "defaultSql") ?? GetStringArgument(arguments, 3);
                 builder.SetDefault(
-                    GetStringArgument(arguments, "schema") ?? GetStringArgument(arguments, 0),
-                    GetStringArgument(arguments, "table") ?? GetStringArgument(arguments, 1),
-                    GetStringArgument(arguments, "column") ?? GetStringArgument(arguments, 2),
-                    GetStringArgument(arguments, "defaultSql") ?? GetStringArgument(arguments, 3));
+                    schemaName,
+                    tableName ?? throw new InvalidOperationException("Missing table name"),
+                    columnName ?? throw new InvalidOperationException("Missing column name"),
+                    defaultSqlSetDefault ?? throw new InvalidOperationException("Missing default SQL"));
                 break;
 
             case "DropDefault":
                 builder.DropDefault(
-                    GetStringArgument(arguments, "schema") ?? GetStringArgument(arguments, 0),
-                    GetStringArgument(arguments, "table") ?? GetStringArgument(arguments, 1),
-                    GetStringArgument(arguments, "column") ?? GetStringArgument(arguments, 2));
+                    schemaName,
+                    tableName ?? throw new InvalidOperationException("Missing table name"),
+                    columnName ?? throw new InvalidOperationException("Missing column name"));
                 break;
 
             case "AddUnique":
                 builder.AddUnique(
-                    GetStringArgument(arguments, "schema") ?? GetStringArgument(arguments, 0),
-                    GetStringArgument(arguments, "table") ?? GetStringArgument(arguments, 1),
-                    GetStringArgument(arguments, "column") ?? GetStringArgument(arguments, 2));
+                    schemaName,
+                    tableName ?? throw new InvalidOperationException("Missing table name"),
+                    columnName ?? throw new InvalidOperationException("Missing column name"));
                 break;
 
             case "DropConstraint":
+                var constraintNameDropConstraint =
+                    GetStringArgument(arguments, "constraintName") ?? GetStringArgument(arguments, 2);
                 builder.DropConstraint(
-                    GetStringArgument(arguments, "schema") ?? GetStringArgument(arguments, 0),
-                    GetStringArgument(arguments, "table") ?? GetStringArgument(arguments, 1),
-                    GetStringArgument(arguments, "constraintName") ?? GetStringArgument(arguments, 2));
+                    schemaName,
+                    tableName ?? throw new InvalidOperationException("Missing table name"),
+                    constraintNameDropConstraint ?? throw new InvalidOperationException("Missing constraint name"));
                 break;
 
             case "AddForeignKey":
+                var constraintNameAddForeignKey =
+                    GetStringArgument(arguments, "constraintName") ?? GetStringArgument(arguments, 3);
+                var refSchemaAddForeignKey =
+                    GetStringArgument(arguments, "refSchema") ?? GetStringArgument(arguments, 4);
+                var refTableAddForeignKey = GetStringArgument(arguments, "refTable") ?? GetStringArgument(arguments, 5);
+                var refColumnAddForeignKey =
+                    GetStringArgument(arguments, "refColumn") ?? GetStringArgument(arguments, 6);
+                var onDeleteRuleAddForeignKey =
+                    GetStringArgument(arguments, "onDeleteRule") ?? GetStringArgument(arguments, 7);
                 builder.AddForeignKey(
-                    GetStringArgument(arguments, "schema") ?? GetStringArgument(arguments, 0),
-                    GetStringArgument(arguments, "table") ?? GetStringArgument(arguments, 1),
-                    GetStringArgument(arguments, "column") ?? GetStringArgument(arguments, 2),
-                    GetStringArgument(arguments, "constraintName") ?? GetStringArgument(arguments, 3),
-                    GetStringArgument(arguments, "refSchema") ?? GetStringArgument(arguments, 4),
-                    GetStringArgument(arguments, "refTable") ?? GetStringArgument(arguments, 5),
-                    GetStringArgument(arguments, "refColumn") ?? GetStringArgument(arguments, 6),
-                    GetStringArgument(arguments, "onDeleteRule") ?? GetStringArgument(arguments, 7));
+                    schemaName,
+                    tableName ?? throw new InvalidOperationException("Missing table name"),
+                    columnName ?? throw new InvalidOperationException("Missing column name"),
+                    constraintNameAddForeignKey ?? throw new InvalidOperationException("Missing constraint name"),
+                    refSchemaAddForeignKey ?? throw new InvalidOperationException("Missing reference schema"),
+                    refTableAddForeignKey ?? throw new InvalidOperationException("Missing reference table"),
+                    refColumnAddForeignKey ?? throw new InvalidOperationException("Missing reference column"),
+                    onDeleteRuleAddForeignKey ?? throw new InvalidOperationException("Missing on delete rule"));
                 break;
         }
     }
@@ -291,9 +305,10 @@ internal static class MigrationUtils
 
         // Parse constraints lambda
         var constraintsLambda = arguments.FirstOrDefault(a => a.NameColon?.Name.Identifier.Text == "constraints");
-        if (constraintsLambda?.Expression is SimpleLambdaExpressionSyntax constraintsSimpleLambda)
-            if (constraintsSimpleLambda.Body is BlockSyntax constraintsBlock)
-                ParseConstraints(constraintsBlock, schema, tableName, builder);
+        if (constraintsLambda?.Expression is not SimpleLambdaExpressionSyntax constraintsSimpleLambda) return;
+
+        if (constraintsSimpleLambda.Body is BlockSyntax constraintsBlock)
+            ParseConstraints(constraintsBlock, schema, tableName, builder);
     }
 
     private static void ParseColumnDefinitions(
@@ -313,9 +328,6 @@ internal static class MigrationUtils
             var columnExpression = initializer.Expression;
             var columnInfo = ParseColumnExpression(columnExpression);
 
-            if (columnInfo == null)
-                continue;
-
             builder.AddColumn(
                 schema,
                 tableName,
@@ -331,7 +343,7 @@ internal static class MigrationUtils
         }
     }
 
-    private static ColumnInfo? ParseColumnExpression(ExpressionSyntax expression)
+    private static ColumnInfo ParseColumnExpression(ExpressionSyntax expression)
     {
         var info = new ColumnInfo { IsNullable = true };
 
@@ -340,28 +352,30 @@ internal static class MigrationUtils
 
         while (current != null)
         {
-            if (current is InvocationExpressionSyntax invocation)
-                // Check if this is table.Column<T>()
-                if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
+            // Check if this is table.Column<T>()
+            if (current is InvocationExpressionSyntax
                 {
-                    var methodName = memberAccess.Name.Identifier.Text;
+                    Expression: MemberAccessExpressionSyntax memberAccess
+                } invocation)
+            {
+                var methodName = memberAccess.Name.Identifier.Text;
 
-                    if (methodName == "Column")
-                    {
-                        // Parse Column<T>() arguments
-                        ParseColumnArguments(invocation.ArgumentList.Arguments, info);
-                        // Move to the parent expression (the chain continues upward)
-                    }
-                    else
-                    {
-                        // Parse fluent method calls (HasPrecision, HasMaxLength, etc.)
-                        ParseFluentMethod(methodName, invocation.ArgumentList.Arguments, info);
-
-                        // Move to the expression on the left side
-                        current = memberAccess.Expression;
-                        continue;
-                    }
+                if (methodName == "Column")
+                {
+                    // Parse Column<T>() arguments
+                    ParseColumnArguments(invocation.ArgumentList.Arguments, info);
+                    // Move to the parent expression (the chain continues upward)
                 }
+                else
+                {
+                    // Parse fluent method calls (HasPrecision, HasMaxLength, etc.)
+                    ParseFluentMethod(methodName, invocation.ArgumentList.Arguments, info);
+
+                    // Move to the expression on the left side
+                    current = memberAccess.Expression;
+                    continue;
+                }
+            }
 
             break;
         }

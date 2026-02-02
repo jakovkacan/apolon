@@ -1,4 +1,5 @@
 ﻿using Apolon.Core.DbSet;
+using Apolon.Core.DbSet.Enums;
 using Apolon.Core.Exceptions;
 
 namespace Apolon.Core.Tests.DbSet;
