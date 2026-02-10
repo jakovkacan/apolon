@@ -128,7 +128,7 @@
         else
             Db.CheckupTypes.Add(editModel);
 
-        Db.SaveChanges();
+        await Db.SaveChangesAsync();
         statusMessage = isEditing ? "Checkup type updated." : "Checkup type created.";
         StartCreate();
         await LoadAsync();
@@ -140,7 +140,7 @@
         statusMessage = null;
 
         Db.CheckupTypes.Remove(checkupType);
-        Db.SaveChanges();
+        await Db.SaveChangesAsync();
         statusMessage = "Checkup type deleted.";
         await LoadAsync();
     }

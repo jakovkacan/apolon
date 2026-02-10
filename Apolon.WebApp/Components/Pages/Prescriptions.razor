@@ -199,7 +199,7 @@
         else
             Db.Prescriptions.Add(editModel);
 
-        Db.SaveChanges();
+        await Db.SaveChangesAsync();
         statusMessage = isEditing ? "Prescription updated." : "Prescription created.";
         StartCreate();
         await LoadAsync();
@@ -211,7 +211,7 @@
         statusMessage = null;
 
         Db.Prescriptions.Remove(prescription);
-        Db.SaveChanges();
+        await Db.SaveChangesAsync();
         statusMessage = "Prescription deleted.";
         await LoadAsync();
     }

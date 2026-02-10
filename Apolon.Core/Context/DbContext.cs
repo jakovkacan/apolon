@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using Apolon.Core.DataAccess;
 using Apolon.Core.DbSet;
+using Apolon.Core.Proxies;
 
 namespace Apolon.Core.Context;
 
@@ -11,12 +12,36 @@ public abstract class DbContext : IDisposable
     private DatabaseFacade? _database;
     private bool _disposed;
 
+    // Lazy loading infrastructure
+    private readonly DbContextOptions _options;
+    private readonly EntityTracker _entityTracker;
+    private readonly NavigationLoadState _navigationLoadState;
+    private readonly ILazyLoader? _lazyLoader;
 
-    protected DbContext(string connectionString)
+    protected DbContext(string connectionString) : this(connectionString, new DbContextOptions())
+    {
+    }
+
+    protected DbContext(string connectionString, DbContextOptions options)
     {
         _connection = new DbConnectionNpgsql(connectionString);
         _connection.OpenConnection();
         _disposed = false;
+        _options = options;
+
+        // Initialize lazy loading infrastructure if enabled
+        if (_options.UseLazyLoadingProxies)
+        {
+            _entityTracker = new EntityTracker();
+            _navigationLoadState = new NavigationLoadState();
+            _lazyLoader = new LazyLoader(_connection, _entityTracker, _navigationLoadState);
+        }
+        else
+        {
+            _entityTracker = null!;
+            _navigationLoadState = null!;
+            _lazyLoader = null;
+        }
     }
 
     public virtual DatabaseFacade Database
@@ -46,13 +71,22 @@ public abstract class DbContext : IDisposable
         return context;
     }
 
+    protected static T Create<T>(string connectionString, DbContextOptions options) where T : DbContext
+    {
+        var context = (T)Activator.CreateInstance(typeof(T),
+            BindingFlags.NonPublic | BindingFlags.Instance,
+            null, [connectionString, options], null)!;
+        context._database = new DatabaseFacade(context._connection);
+        return context;
+    }
+
     // Generic DbSet accessor
     protected DbSet<T> Set<T>() where T : class
     {
         var type = typeof(T);
         if (_dbSets.TryGetValue(type, out var value)) return (DbSet<T>)value;
 
-        value = new DbSet<T>(_connection);
+        value = new DbSet<T>(_connection, _lazyLoader, _entityTracker, _navigationLoadState);
         _dbSets[type] = value;
         return (DbSet<T>)value;
     }
@@ -97,3 +131,4 @@ public abstract class DbContext : IDisposable
         await _connection.DisposeAsync();
     }
 }
+

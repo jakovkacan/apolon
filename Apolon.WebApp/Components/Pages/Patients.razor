@@ -167,7 +167,7 @@
         else
             Db.Patients.Add(editModel);
 
-        Db.SaveChanges();
+        await Db.SaveChangesAsync();
         statusMessage = isEditing ? "Patient updated." : "Patient created.";
         StartCreate();
         await LoadAsync();
@@ -179,7 +179,7 @@
         statusMessage = null;
 
         Db.Patients.Remove(patient);
-        Db.SaveChanges();
+        await Db.SaveChangesAsync();
         statusMessage = "Patient deleted.";
         await LoadAsync();
     }

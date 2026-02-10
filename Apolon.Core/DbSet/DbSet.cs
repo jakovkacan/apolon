@@ -6,6 +6,7 @@ using Apolon.Core.Attributes;
 using Apolon.Core.DataAccess;
 using Apolon.Core.Mapping;
 using Apolon.Core.Mapping.Models;
+using Apolon.Core.Proxies;
 using Apolon.Core.Sql;
 
 namespace Apolon.Core.DbSet;
@@ -18,11 +19,25 @@ public class DbSet<T> : IEnumerable<T>
     private readonly DatabaseExecutor _executor;
     private readonly List<T> _localCache = [];
     private readonly EntityMetadata _metadata = EntityMapper.GetMetadata(typeof(T));
+    
+    // Lazy loading infrastructure
+    private readonly ILazyLoader? _lazyLoader;
+    private readonly EntityTracker? _entityTracker;
+    private readonly NavigationLoadState? _navigationLoadState;
 
     internal DbSet(IDbConnection connection)
     {
         _connection = connection;
         _executor = new DatabaseExecutor(connection);
+    }
+
+    internal DbSet(IDbConnection connection, ILazyLoader? lazyLoader, EntityTracker? entityTracker, NavigationLoadState? navigationLoadState)
+    {
+        _connection = connection;
+        _executor = new DatabaseExecutor(connection, lazyLoader, entityTracker, navigationLoadState);
+        _lazyLoader = lazyLoader;
+        _entityTracker = entityTracker;
+        _navigationLoadState = navigationLoadState;
     }
 
     public IEnumerator<T> GetEnumerator()
@@ -121,6 +136,15 @@ public class DbSet<T> : IEnumerable<T>
             else
             {
                 LoadReference(entities, navigationProperty, navigationPropertyType);
+            }
+            
+            // Mark navigation properties as loaded to prevent lazy loading
+            if (_navigationLoadState != null)
+            {
+                foreach (var entity in entities)
+                {
+                    _navigationLoadState.MarkNavigationLoaded(entity, navigationProperty.Name);
+                }
             }
         }
 

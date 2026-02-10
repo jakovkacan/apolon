@@ -1,22 +1,45 @@
 using System.Data.Common;
 using Apolon.Core.Exceptions;
 using Apolon.Core.Mapping;
+using Apolon.Core.Mapping.Models;
+using Apolon.Core.Proxies;
 using Apolon.Core.Sql;
 
 namespace Apolon.Core.DataAccess;
 
-internal class DatabaseExecutor(IDbConnection connection)
+internal class DatabaseExecutor
 {
+    private readonly IDbConnection _connection;
+    private readonly ILazyLoader? _lazyLoader;
+    private readonly EntityTracker? _entityTracker;
+    private readonly NavigationLoadState? _navigationLoadState;
+
+    public DatabaseExecutor(IDbConnection connection)
+    {
+        _connection = connection;
+        _lazyLoader = null;
+        _entityTracker = null;
+        _navigationLoadState = null;
+    }
+
+    public DatabaseExecutor(IDbConnection connection, ILazyLoader? lazyLoader, EntityTracker? entityTracker, NavigationLoadState? navigationLoadState)
+    {
+        _connection = connection;
+        _lazyLoader = lazyLoader;
+        _entityTracker = entityTracker;
+        _navigationLoadState = navigationLoadState;
+    }
+
     public int Insert<T>(T entity) where T : class
     {
         var builder = new CommandBuilder<T>();
         var (sql, values) = builder.BuildInsert(entity);
-        var command = connection.CreateCommand(sql);
+        var command = _connection.CreateCommand(sql);
 
         for (var i = 0; i < values.Count; i++)
-            connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
+            _connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
 
-        var generatedId = connection.ExecuteScalar(command);
+        var generatedId = _connection.ExecuteScalar(command);
     
         // Set the generated ID back on the entity
         var metadata = EntityMapper.GetMetadata(typeof(T));
@@ -29,12 +52,12 @@ internal class DatabaseExecutor(IDbConnection connection)
     {
         var builder = new CommandBuilder<T>();
         var (sql, values) = builder.BuildInsert(entity);
-        var command = connection.CreateCommand(sql);
+        var command = _connection.CreateCommand(sql);
 
         for (var i = 0; i < values.Count; i++)
-            connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
+            _connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
         
-        var generatedId = await connection.ExecuteScalarAsync(command);
+        var generatedId = await _connection.ExecuteScalarAsync(command);
     
         // Set the generated ID back on the entity
         var metadata = EntityMapper.GetMetadata(typeof(T));
@@ -47,28 +70,28 @@ internal class DatabaseExecutor(IDbConnection connection)
     {
         var builder = new CommandBuilder<T>();
         var (sql, values, pkValue) = builder.BuildUpdate(entity);
-        var command = connection.CreateCommand(sql);
+        var command = _connection.CreateCommand(sql);
 
         for (var i = 0; i < values.Count; i++)
-            connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
+            _connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
 
-        connection.AddParameter(command, "@pk", pkValue);
+        _connection.AddParameter(command, "@pk", pkValue);
 
-        return connection.ExecuteNonQuery(command);
+        return _connection.ExecuteNonQuery(command);
     }
 
     public Task<int> UpdateAsync<T>(T entity) where T : class
     {
         var builder = new CommandBuilder<T>();
         var (sql, values, pkValue) = builder.BuildUpdate(entity);
-        var command = connection.CreateCommand(sql);
+        var command = _connection.CreateCommand(sql);
 
         for (var i = 0; i < values.Count; i++)
-            connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
+            _connection.AddParameter(command, $"@p{i}", TypeMapper.ConvertToDb(values[i]));
 
-        connection.AddParameter(command, "@pk", pkValue);
+        _connection.AddParameter(command, "@pk", pkValue);
 
-        return connection.ExecuteNonQueryAsync(command);
+        return _connection.ExecuteNonQueryAsync(command);
     }
 
     public int Delete<T>(T entity) where T : class
@@ -76,10 +99,10 @@ internal class DatabaseExecutor(IDbConnection connection)
         var builder = new CommandBuilder<T>();
         var (sql, pkValue) = builder.BuildDelete(entity);
 
-        var command = connection.CreateCommand(sql);
-        connection.AddParameter(command, "@pk", pkValue);
+        var command = _connection.CreateCommand(sql);
+        _connection.AddParameter(command, "@pk", pkValue);
 
-        return connection.ExecuteNonQuery(command);
+        return _connection.ExecuteNonQuery(command);
     }
 
     public Task<int> DeleteAsync<T>(T entity) where T : class
@@ -87,23 +110,37 @@ internal class DatabaseExecutor(IDbConnection connection)
         var builder = new CommandBuilder<T>();
         var (sql, pkValue) = builder.BuildDelete(entity);
 
-        var command = connection.CreateCommand(sql);
-        connection.AddParameter(command, "@pk", pkValue);
+        var command = _connection.CreateCommand(sql);
+        _connection.AddParameter(command, "@pk", pkValue);
 
-        return connection.ExecuteNonQueryAsync(command);
+        return _connection.ExecuteNonQueryAsync(command);
     }
 
     public List<T> Query<T>(QueryBuilder<T> qb) where T : class
     {
-        var command = connection.CreateCommandWithParameters(qb.Build(), qb.GetParameters());
+        var command = _connection.CreateCommandWithParameters(qb.Build(), qb.GetParameters());
 
         var result = new List<T>();
         try
         {
-            using var reader = connection.ExecuteReader(command);
+            using var reader = _connection.ExecuteReader(command);
             var metadata = EntityMapper.GetMetadata(typeof(T));
 
-            while (reader.Read()) result.Add(EntityMapper.MapEntity<T>(reader, metadata));
+            while (reader.Read())
+            {
+                T entity;
+                if (_lazyLoader != null && _entityTracker != null)
+                {
+                    // Use lazy loading-aware mapping
+                    entity = (T)MapEntityWithLazyLoading(reader, metadata);
+                }
+                else
+                {
+                    // Standard mapping
+                    entity = EntityMapper.MapEntity<T>(reader, metadata);
+                }
+                result.Add(entity);
+            }
         }
         catch (DbException ex)
         {
@@ -117,15 +154,29 @@ internal class DatabaseExecutor(IDbConnection connection)
 
     public async Task<List<T>> QueryAsync<T>(QueryBuilder<T> qb) where T : class
     {
-        var command = connection.CreateCommandWithParameters(qb.Build(), qb.GetParameters());
+        var command = _connection.CreateCommandWithParameters(qb.Build(), qb.GetParameters());
 
         var result = new List<T>();
         try
         {
-            await using var reader = await connection.ExecuteReaderAsync(command);
+            await using var reader = await _connection.ExecuteReaderAsync(command);
             var metadata = EntityMapper.GetMetadata(typeof(T));
 
-            while (await reader.ReadAsync()) result.Add(EntityMapper.MapEntity<T>(reader, metadata));
+            while (await reader.ReadAsync())
+            {
+                T entity;
+                if (_lazyLoader != null && _entityTracker != null)
+                {
+                    // Use lazy loading-aware mapping
+                    entity = (T)MapEntityWithLazyLoading(reader, metadata);
+                }
+                else
+                {
+                    // Standard mapping
+                    entity = EntityMapper.MapEntity<T>(reader, metadata);
+                }
+                result.Add(entity);
+            }
         }
         catch (DbException ex)
         {
@@ -142,17 +193,61 @@ internal class DatabaseExecutor(IDbConnection connection)
         if (sqlBatch.Count == 0)
             return;
 
-        await connection.BeginTransactionAsync(ct);
+        await _connection.BeginTransactionAsync(ct);
         try
         {
             foreach (var sql in sqlBatch)
-                await connection.ExecuteNonQueryAsync(connection.CreateCommand(sql));
-            await connection.CommitTransactionAsync(ct);
+                await _connection.ExecuteNonQueryAsync(_connection.CreateCommand(sql));
+            await _connection.CommitTransactionAsync(ct);
         }
         catch
         {
-            await connection.RollbackTransactionAsync(ct);
+            await _connection.RollbackTransactionAsync(ct);
             throw;
         }
+    }
+
+    private object MapEntityWithLazyLoading(DbDataReader reader, EntityMetadata metadata)
+    {
+        // Check if entity is already tracked
+        var pkOrdinal = reader.GetOrdinal(metadata.PrimaryKey.ColumnName);
+        var pkValue = reader.GetValue(pkOrdinal);
+
+        // Try to get tracked entity
+        var trackedMethod = typeof(EntityTracker).GetMethod("TryGetTracked")!.MakeGenericMethod(metadata.EntityType);
+        var parameters = new[] { pkValue, null };
+        var isTracked = (bool)trackedMethod.Invoke(_entityTracker, parameters)!;
+
+        if (isTracked && parameters[1] != null)
+        {
+            return parameters[1];
+        }
+
+        // Create proxy if navigation properties exist
+        var hasNavigationProperties = metadata.Relationships.Count > 0;
+        
+        object entity;
+        if (hasNavigationProperties && _navigationLoadState != null)
+        {
+            entity = LazyLoadingProxyFactory.CreateProxy(metadata.EntityType, _lazyLoader!, _navigationLoadState);
+        }
+        else
+        {
+            entity = Activator.CreateInstance(metadata.EntityType)!;
+        }
+
+        // Map scalar properties
+        foreach (var column in metadata.Columns)
+        {
+            var ordinal = reader.GetOrdinal(column.ColumnName);
+            var value = reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal);
+            var convertedValue = TypeMapper.ConvertFromDb(value, column.Property.PropertyType);
+            column.Property.SetValue(entity, convertedValue);
+        }
+
+        // Track the entity
+        _entityTracker!.TrackEntity(metadata.EntityType, entity, pkValue);
+
+        return entity;
     }
 }

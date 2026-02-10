@@ -1,4 +1,4 @@
-﻿using Apolon.Core.Attributes;
+﻿﻿using Apolon.Core.Attributes;
 
 namespace Apolon.Models;
 
@@ -22,8 +22,8 @@ public class Prescription : BaseEntity
     public DateTime? EndDate { get; set; }
 
     // Navigation properties
-    public Checkup? Checkup { get; set; }
-    public Medication? Medication { get; set; }
+    public virtual Checkup? Checkup { get; set; }
+    public virtual Medication? Medication { get; set; }
 
     public override string ToString()
     {

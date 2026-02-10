@@ -1,4 +1,4 @@
-﻿using Apolon.Core.Attributes;
+﻿﻿using Apolon.Core.Attributes;
 
 namespace Apolon.Models;
 
@@ -23,9 +23,9 @@ public class Checkup : BaseEntity
     // public required string Test { get; set; }
 
     // Navigation properties
-    public Patient? Patient { get; set; }
-    public CheckupType? CheckupType { get; set; }
-    public ICollection<Prescription> Prescriptions { get; set; } = new List<Prescription>();
+    public virtual Patient? Patient { get; set; }
+    public virtual CheckupType? CheckupType { get; set; }
+    public virtual ICollection<Prescription> Prescriptions { get; set; } = new List<Prescription>();
 
     public override string ToString()
     {

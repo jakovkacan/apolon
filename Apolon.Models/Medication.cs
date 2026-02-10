@@ -1,4 +1,4 @@
-﻿using Apolon.Core.Attributes;
+﻿﻿using Apolon.Core.Attributes;
 
 namespace Apolon.Models;
 
@@ -10,7 +10,7 @@ public class Medication : BaseEntity
     public required string DosageForm { get; set; }
 
     // Navigation properties
-    public ICollection<Prescription> Prescriptions { get; set; } = new List<Prescription>();
+    public virtual ICollection<Prescription> Prescriptions { get; set; } = new List<Prescription>();
 
     public override string ToString()
     {

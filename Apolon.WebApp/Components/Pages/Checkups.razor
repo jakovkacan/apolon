@@ -183,7 +183,7 @@
         else
             Db.Checkups.Add(editModel);
 
-        Db.SaveChanges();
+        await Db.SaveChangesAsync();
         statusMessage = isEditing ? "Checkup updated." : "Checkup created.";
         StartCreate();
         await LoadAsync();
@@ -195,7 +195,7 @@
         statusMessage = null;
 
         Db.Checkups.Remove(checkup);
-        Db.SaveChanges();
+        await Db.SaveChangesAsync();
         statusMessage = "Checkup deleted.";
         await LoadAsync();
     }
