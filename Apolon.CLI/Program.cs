@@ -1,7 +1,7 @@
 using System.CommandLine;
 using Apolon.CLI.Commands;
 
-var rootCommand = new RootCommand("Apolon CLI - ORM management tool");
+var rootCommand = new RootCommand("Apolon - ORM management tool");
 
 rootCommand.AddCommand(InitCommand.Create());
 

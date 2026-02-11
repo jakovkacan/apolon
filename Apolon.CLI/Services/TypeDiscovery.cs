@@ -168,7 +168,7 @@ internal static class TypeDiscovery
             : entityTypes.ToArray();
     }
 
-    internal static async Task<(Type Type, string Timestamp, string Name)[]> DiscoverMigrationTypes(
+    internal static async Task<MigrationTypeInfo[]> DiscoverMigrationTypes(
         string migrationsPath, bool rebuildProject = true)
     {
         var fullPath = Path.GetFullPath(migrationsPath);
@@ -206,7 +206,7 @@ internal static class TypeDiscovery
         return migrations;
     }
 
-    private static (Type Type, string Timestamp, string Name) ParseMigrationFromFile(Type type, string[] csFiles)
+    private static MigrationTypeInfo ParseMigrationFromFile(Type type, string[] csFiles)
     {
         var className = type.Name;
 
@@ -223,10 +223,22 @@ internal static class TypeDiscovery
         {
             var fileName = Path.GetFileNameWithoutExtension(matchingFile);
             var timestamp = fileName[..14];
-            return (type, timestamp, className);
+            return new MigrationTypeInfo
+            {
+                Type = type,
+                Timestamp = timestamp,
+                Name = className,
+                SourceFilePath = matchingFile
+            };
         }
 
-        return (type, "00000000000000", className);
+        return new MigrationTypeInfo
+        {
+            Type = type,
+            Timestamp = "00000000000000",
+            Name = className,
+            SourceFilePath = null
+        };
     }
 
     private static Assembly CompileMigrationsAsync(string[] migrationFiles)
@@ -326,3 +338,12 @@ global using System.Linq.Expressions;
         return (type, "00000000000000", className);
     }
 }
+
+internal class MigrationTypeInfo
+{
+    public required Type Type { get; init; }
+    public required string Timestamp { get; init; }
+    public required string Name { get; init; }
+    public string? SourceFilePath { get; init; }
+}
+

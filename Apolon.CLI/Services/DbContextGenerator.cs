@@ -10,7 +10,8 @@ internal static class DbContextGenerator
         string connectionString,
         string modelsPath,
         string? outputPath = null,
-        string? namespaceName = null)
+        string? dbContextNamespaceName = null,
+        string? rootNamespaceName = null)
     {
         // Validate database connection first
         Console.WriteLine("Validating database connection...");
@@ -32,7 +33,7 @@ internal static class DbContextGenerator
         if (!Directory.Exists(finalOutputPath)) Directory.CreateDirectory(finalOutputPath);
 
         // Determine namespace (infer from directory if not specified)
-        var finalNamespace = namespaceName ?? InferNamespace(finalOutputPath);
+        var finalNamespace = dbContextNamespaceName ?? InferNamespace(finalOutputPath, rootNamespaceName);
 
         // Get the models namespace from the first entity (they should all be in the same namespace)
         var modelsNamespace = entities.Length > 0 ? entities[0].Namespace : InferNamespace(modelsPath);
@@ -100,16 +101,20 @@ internal static class DbContextGenerator
         return sb.ToString();
     }
 
-    private static string InferNamespace(string path)
+    private static string InferNamespace(string path, string? rootNamespaceName = null)
     {
         // Get the directory name as namespace
         var dirInfo = new DirectoryInfo(Path.GetFullPath(path));
+
+        var dbContextNamespace = dirInfo.Name;
+
+        if (!string.IsNullOrEmpty(rootNamespaceName)) dbContextNamespace = $"{rootNamespaceName}.{dbContextNamespace}";
 
         // Try to find a .csproj file to determine project name
         var projectFiles = dirInfo.GetFiles("*.csproj", SearchOption.TopDirectoryOnly);
         return projectFiles.Length > 0
             ? Path.GetFileNameWithoutExtension(projectFiles[0].Name)
-            : dirInfo.Name;
+            : dbContextNamespace;
     }
 
     private static string GenerateDbContextCode(
@@ -142,6 +147,13 @@ internal static class DbContextGenerator
         sb.AppendLine("    }");
         sb.AppendLine();
 
+        // Private constructor with DbContextOptions
+        sb.AppendLine(
+            $"    private {className}(string connectionString, DbContextOptions options) : base(connectionString, options)");
+        sb.AppendLine("    {");
+        sb.AppendLine("    }");
+        sb.AppendLine();
+
         // Create method with embedded connection string
         sb.AppendLine($"    public static {className} Create()");
         sb.AppendLine("    {");
@@ -154,6 +166,26 @@ internal static class DbContextGenerator
         sb.AppendLine($"    public static {className} Create(string connectionString)");
         sb.AppendLine("    {");
         sb.AppendLine($"        return Create<{className}>(connectionString);");
+        sb.AppendLine("    }");
+
+        // Create method with embedded connection string and lazy loading
+        sb.AppendLine($"    public static {className} CreateWithLazyLoading()");
+        sb.AppendLine("    {");
+        sb.AppendLine($"        const string connectionString = \"{EscapeConnectionString(connectionString)}\";");
+        sb.AppendLine("        var options = new DbContextOptionsBuilder()");
+        sb.AppendLine("            .UseLazyLoadingProxies()");
+        sb.AppendLine("            .Build();");
+        sb.AppendLine($"        return Create<{className}>(connectionString, options);");
+        sb.AppendLine("    }");
+        sb.AppendLine();
+
+        // Overload for custom connection string and lazy loading
+        sb.AppendLine($"    public static {className} CreateWithLazyLoading(string connectionString)");
+        sb.AppendLine("    {");
+        sb.AppendLine("        var options = new DbContextOptionsBuilder()");
+        sb.AppendLine("            .UseLazyLoadingProxies()");
+        sb.AppendLine("            .Build();");
+        sb.AppendLine($"        return Create<{className}>(connectionString, options);");
         sb.AppendLine("    }");
 
         // DbSet properties for each entity

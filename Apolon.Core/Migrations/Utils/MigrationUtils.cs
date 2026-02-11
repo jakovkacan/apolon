@@ -55,7 +55,7 @@ internal static class MigrationUtils
     }
 
     public static IReadOnlyList<MigrationOperation> ExtractOperationsFromMigrationTypes(
-        IEnumerable<Type> migrationTypes)
+        IEnumerable<MigrationTypeWrapper> migrationTypes)
     {
         return migrationTypes
             .Select(ExtractOperationsFromMigration)
@@ -66,44 +66,20 @@ internal static class MigrationUtils
     /// <summary>
     ///     Extracts MigrationOperations from a migration type by reading its source file and parsing the Up method.
     /// </summary>
-    /// <param name="migrationType">The Type of the migration class.</param>
+    /// <param name="migrationInfo">The migration type info containing the Type and source file path.</param>
     /// <returns>List of operations performed in the Up method.</returns>
-    private static IReadOnlyList<MigrationOperation> ExtractOperationsFromMigration(Type migrationType)
+    private static IReadOnlyList<MigrationOperation> ExtractOperationsFromMigration(MigrationTypeWrapper migrationInfo)
     {
-        // Get the source file path from the type's assembly location
-        var assemblyLocation = migrationType.Assembly.Location;
-        var assemblyDirectory = Path.GetDirectoryName(assemblyLocation);
-
-        if (string.IsNullOrEmpty(assemblyDirectory))
+        // Use the source file path directly from the migration info
+        var sourceFilePath = migrationInfo.SourceFilePath;
+        
+        if (string.IsNullOrEmpty(sourceFilePath))
             throw new InvalidOperationException(
-                $"Could not determine assembly directory for type {migrationType.FullName}");
+                $"Source file path not available for migration type {migrationInfo.Type.FullName}");
 
-        // Try to find the source file
-        // Look in typical migration folders: Migrations, Data/Migrations, etc.
-        var possibleDirectories = new[]
-        {
-            Path.Combine(assemblyDirectory, "..", "..", "..", "Migrations"),
-            Path.Combine(assemblyDirectory, "..", "..", "..", "Data", "Migrations"),
-            Path.Combine(assemblyDirectory, "Migrations")
-        };
-
-        string? sourceFilePath = null;
-        foreach (var directory in possibleDirectories)
-        {
-            var normalizedDirectory = Path.GetFullPath(directory);
-            if (!Directory.Exists(normalizedDirectory)) continue;
-
-            // Search for files matching pattern: *_{ClassName}.cs to handle timestamp prefixes
-            var matchingFiles = Directory.GetFiles(normalizedDirectory, $"*_{migrationType.Name}.cs");
-            if (matchingFiles.Length > 0)
-            {
-                sourceFilePath = matchingFiles[0]; // Take the first match
-                break;
-            }
-        }
-
-        if (sourceFilePath == null)
-            throw new FileNotFoundException($"Could not find source file for migration type {migrationType.Name}");
+        if (!File.Exists(sourceFilePath))
+            throw new FileNotFoundException(
+                $"Could not find source file for migration type {migrationInfo.Type.Name} at {sourceFilePath}");
 
         var sourceCode = File.ReadAllText(sourceFilePath);
         return ExtractOperationsFromMigrationSource(sourceCode);
@@ -564,4 +540,6 @@ internal class MigrationTypeWrapper
     public required Type Type { get; init; }
     public required string Name { get; init; }
     public required string Timestamp { get; set; }
+    public string? SourceFilePath { get; init; }
 }
+

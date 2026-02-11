@@ -7,8 +7,9 @@
         <Nullable>enable</Nullable>
         <PackAsTool>true</PackAsTool>
         <ToolCommandName>apolon</ToolCommandName>
+        <AssemblyName>apolon</AssemblyName>
         <PackageId>Apolon.CLI</PackageId>
-        <Version>1.0.51</Version>
+        <Version>1.1.0</Version>
     </PropertyGroup>
 
     <ItemGroup>

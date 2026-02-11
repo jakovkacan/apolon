@@ -23,7 +23,12 @@ internal static class InitCommand
             () => null,
             "Output path for the DbContext file (if not specified, will be placed in the models directory)");
 
-        var namespaceOption = new Option<string?>(
+        var rootNamespace = new Option<string?>(
+            ["--root-namespace", "-N"],
+            () => null,
+            "Root namespace of the project");
+
+        var dbContextNamespace = new Option<string?>(
             ["--namespace", "-n"],
             () => null,
             "Namespace for the generated DbContext class (if not specified, will be inferred from output directory)");
@@ -31,14 +36,16 @@ internal static class InitCommand
         command.AddArgument(connectionStringArg);
         command.AddOption(modelsPathOption);
         command.AddOption(outputPathOption);
-        command.AddOption(namespaceOption);
+        command.AddOption(dbContextNamespace);
+        command.AddOption(rootNamespace);
 
         command.SetHandler(async context =>
         {
             var connectionString = context.ParseResult.GetValueForArgument(connectionStringArg);
             var modelsPath = context.ParseResult.GetValueForOption(modelsPathOption)!;
             var outputPath = context.ParseResult.GetValueForOption(outputPathOption);
-            var namespaceName = context.ParseResult.GetValueForOption(namespaceOption);
+            var dbContextNamespaceName = context.ParseResult.GetValueForOption(dbContextNamespace);
+            var rootNamespaceName = context.ParseResult.GetValueForOption(rootNamespace);
 
             try
             {
@@ -46,14 +53,15 @@ internal static class InitCommand
                     connectionString,
                     modelsPath,
                     outputPath,
-                    namespaceName);
+                    dbContextNamespaceName,
+                    rootNamespaceName);
 
                 Console.WriteLine($"\nDbContext generated successfully at: {filePath}");
 
                 // Save configuration
                 var finalOutputPath = outputPath ?? modelsPath;
                 var rootDir = new DirectoryInfo(finalOutputPath).Parent?.FullName;
-                var finalNamespace = namespaceName ?? new DirectoryInfo(Path.GetFullPath(finalOutputPath)).Name;
+                var finalNamespace = rootNamespaceName ?? new DirectoryInfo(Path.GetFullPath(finalOutputPath)).Name;
 
                 var config = new ProjectConfiguration
                 {

@@ -14,7 +14,7 @@
 
     <ItemGroup>
         <InternalsVisibleTo Include="Apolon.Core.Tests"/>
-        <InternalsVisibleTo Include="Apolon.CLI"/>
+        <InternalsVisibleTo Include="apolon"/>
     </ItemGroup>
 
 

@@ -38,13 +38,19 @@ internal static class MigrationGenerator
         var migrationTypes = await TypeDiscovery.DiscoverMigrationTypes(migrationsPath, false);
         var committedMigrations = migrationTypes
             .Where(mt => !appliedMigrations?.Contains($"{mt.Name}") ?? true)
-            .Select(mt => mt.Type)
             .ToList();
 
         Console.WriteLine(
             $"Found {committedMigrations.Count} commited but not applied migrations: {string.Join(", ", committedMigrations.Select(m => m.Name))}");
 
-        var committedOperations = MigrationUtils.ExtractOperationsFromMigrationTypes(committedMigrations);
+        var committedOperations = MigrationUtils.ExtractOperationsFromMigrationTypes(
+            committedMigrations.Select(m => new MigrationTypeWrapper
+            {
+                Type = m.Type,
+                Name = m.Name,
+                Timestamp = m.Timestamp,
+                SourceFilePath = m.SourceFilePath
+            }));
         var commitedSnapshot = SnapshotBuilder.ApplyMigrations(dbSnapshot, committedOperations);
 
         Console.WriteLine("Comparing snapshots...");

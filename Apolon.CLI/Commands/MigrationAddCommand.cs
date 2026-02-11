@@ -56,7 +56,7 @@ internal static class MigrationAddCommand
                 var modelsPath = modelsPathOverride ?? config.ModelsPath;
                 var migrationsPath = migrationsPathOverride ?? config.MigrationsPath;
                 var connectionString = connectionStringOverride ?? config.ConnectionString;
-                var namespaceName = namespaceOverride ?? config.Namespace;
+                var namespaceName = namespaceOverride ?? (config.Namespace + ".Migrations");
 
                 Console.WriteLine("Using configuration:");
                 Console.WriteLine($"  Models: {modelsPath}");

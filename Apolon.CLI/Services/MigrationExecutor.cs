@@ -1,4 +1,4 @@
-﻿using Apolon.Core.DataAccess;
+﻿﻿using Apolon.Core.DataAccess;
 using Apolon.Core.Migrations;
 
 namespace Apolon.CLI.Services;
@@ -20,7 +20,7 @@ internal static class MigrationExecutor
         }
 
         Console.WriteLine($"Found {migrationTypes.Length} migration(s):");
-        foreach (var (_, timestamp, name) in migrationTypes) Console.WriteLine($"  - {timestamp}_{name}");
+        foreach (var migration in migrationTypes) Console.WriteLine($"  - {migration.Timestamp}_{migration.Name}");
 
         await using var connection = new DbConnectionNpgsql(connectionString);
         await connection.OpenConnectionAsync();
@@ -30,7 +30,10 @@ internal static class MigrationExecutor
         var applied = await runner.GetAppliedMigrationsAsync();
         Console.WriteLine($"\nAlready applied: {applied.Count} migration(s)");
 
-        var toRun = MigrationRunner.DetermineMigrationsToRun(migrationTypes, applied, targetMigration);
+        var toRun = MigrationRunner.DetermineMigrationsToRun(
+            migrationTypes.Select(m => (m.Type, m.Timestamp, m.Name)).ToArray(), 
+            applied, 
+            targetMigration);
         if (toRun.Count == 0)
         {
             Console.WriteLine("\n✓ Database is up to date. No migrations to apply.");
@@ -41,7 +44,9 @@ internal static class MigrationExecutor
         // Optionally print each migration being applied
         foreach (var (_, _, _, fullName) in toRun) Console.WriteLine($"  - {fullName}");
 
-        var executed = await runner.ApplyMigrationsAsync(migrationTypes, targetMigration);
+        var executed = await runner.ApplyMigrationsAsync(
+            migrationTypes.Select(m => (m.Type, m.Timestamp, m.Name)).ToArray(), 
+            targetMigration);
         Console.WriteLine($"\n✓ Successfully applied {executed} migration(s)");
         return executed;
     }
@@ -73,7 +78,10 @@ internal static class MigrationExecutor
         }
 
         // Preview rollbacks
-        var toRollback = MigrationRunner.GetMigrationsToRollback(migrationTypes, applied, targetMigration);
+        var toRollback = MigrationRunner.GetMigrationsToRollback(
+            migrationTypes.Select(m => (m.Type, m.Timestamp, m.Name)).ToArray(), 
+            applied, 
+            targetMigration);
         if (toRollback.Count == 0)
         {
             Console.WriteLine($"\n✓ Database is already at migration '{targetMigration}'");
@@ -93,7 +101,9 @@ internal static class MigrationExecutor
             return 0;
         }
 
-        var rolledBack = await runner.RollbackToAsync(migrationTypes, targetMigration);
+        var rolledBack = await runner.RollbackToAsync(
+            migrationTypes.Select(m => (m.Type, m.Timestamp, m.Name)).ToArray(), 
+            targetMigration);
         Console.WriteLine($"\n✓ Successfully rolled back {rolledBack} migration(s)");
         return rolledBack;
     }

@@ -19,8 +19,9 @@ public class Checkup : BaseEntity
     public string? Notes { get; set; }
     public string? Results { get; set; }
 
-    // [NotMapped]
-    // public required string Test { get; set; }
+    [NotMapped]
+    // [Column("test", DbType = "VARCHAR(100)")]
+    public required string Test { get; set; }
 
     // Navigation properties
     public virtual Patient? Patient { get; set; }
